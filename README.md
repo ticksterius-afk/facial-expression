@@ -41,7 +41,13 @@ port whose tests must reproduce the web engine's outputs exactly.
 2. Open **https://ticksterius-afk.github.io/facial-expression/** in Safari.
 3. Tap **Start camera** and allow camera access.
 4. Tap **Calibrate** and hold a relaxed face for 3 seconds. This matters: see [why](docs/VALIDATION.md#1-what-mediapipe-actually-outputs).
-5. Optional: Share → **Add to Home Screen** for a full-screen app that also works offline.
+5. Then do the **range calibration** it offers: seven faces made as strongly as you
+   can (brows up, frown, eyes wide, lips stretched, smile, mouth down, nose wrinkle),
+   about 20 seconds. It scales each signal to how far *your* face moves, which helps
+   most with the brows. Redo it any time under Settings → *Calibrate expression range*.
+6. Optional: Settings → **Extended emotion catalogue** adds triumph, frustration,
+   anxiety, thinking, disappointment and sneer.
+7. Optional: Share → **Add to Home Screen** for a full-screen app that also works offline.
 
 ### On your iPhone 16 Pro — native app (TrueDepth, most accurate)
 

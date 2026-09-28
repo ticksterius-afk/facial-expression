@@ -88,6 +88,49 @@ learned agree with FACS:** AU12 and AU6 for happiness; AU25, AU5 and AU1 for
 surprise; AU1, AU41 and AU15 for sadness, with AU2 and AU5 *against* it; AU7, AU9
 and an open mouth for anger, with AU1 strongly *against* it.
 
+### Round 2 (v1.2.0): fear, brows and the forehead
+
+The same photos (2,109 after decoding) were used to test every change before it
+shipped. Scores below are for the uncalibrated photo setting; "balanced" is the
+mean recall over the seven labels with at least 18 photos.
+
+| Change | Accuracy | Balanced | Fear found | Photos wrongly called fear |
+|---|---|---|---|---|
+| v1.0.0 | 45.6% | 31.8% | 1 / 18 | 12 |
+| First draft: fear as best of full face, 1+2+5 and 5+20 (tier strictness) | 43.5% | 31.9% | 3 / 18 | 137 |
+| Partial faces as strict ANDs | 44.6% | 31.7% | 2 / 18 | 58 |
+| Full face restored to v1.0 weights; partials 1+2+4+5 and 5+20, strict | **45.4%** | **31.7%** | 1 / 18 | 32 |
+
+The first draft was rejected: its 1+2+5 variant fired on 54 surprise photos, and its
+two-action variants fired when only one action was present. What separates fear from
+surprise on these photos (ROC AUC, fear vs surprise): stretched lips AU20 0.72, lip
+corners down AU15 0.68, glabella furrows 0.68, lip stretch blendshape 0.67, wide eyes
+AU5 only 0.63, while an open jaw points to surprise (0.64 the other way). The 18 fear
+photos are mild (median AU5 0.20, AU20 0.11), too weak to show the partial faces'
+benefit; they are kept because EMFACS lists them and range calibration scales these
+movements to each person's maximum.
+
+**Forehead texture.** Horizontal forehead wrinkles and vertical glabella furrows,
+measured from pixels, separate raised brows (surprise AUC 0.64, fear 0.71) and frowns
+(anger 0.62, better than MediaPipe's `browDown` at 0.56 and the landmark brow gap at
+0.46). On the face video, however, they followed **head pitch** (r = 0.79 forehead,
+−0.70 glabella) more than the brows (r = 0.24); a second-derivative ridge measure did
+not remove this (0.68). They are therefore **pose-gated**: full weight within 6° of the
+person's baseline pitch and yaw, none beyond 14°. With the gate, on the 298
+near-frontal photos they raise balanced accuracy from 37.4% to 38.4% (sadness +5,
+anger +3, surprise +2 points, neutral −3), and the calibrated video output is almost
+unchanged (the confound is gone).
+
+**Why fear is still hard on the web.** In the face video the actress shows a clear
+fear face (inner brows up and drawn together, eyes wide, hand over the mouth). After
+calibration MediaPipe registers wide eyes (AU5 ≈ 0.5) and parted lips, but the
+inner-brow blendshape moves only +0.07 and the landmark brow heights and brow gap do
+not move at all, so the frame reads as surprise (0.56–0.80) over fear (≈ 0.3). No
+reweighting of the scoring fixes a movement that is not measured: making surprise
+require a dropped jaw turned this segment into anger/disgust instead of fear, and cost
+10 points of surprise recall on photos. The iPhone app's TrueDepth blendshapes
+measure the brows directly and do not have this gap.
+
 ## 4. Video (stateful engine)
 
 A 20-second stock clip (Pexels, via the py-feat test data) of an actress going
@@ -109,17 +152,21 @@ full engine with filtering, adaptive baselines and calibration:
 | Suite | What it checks |
 |---|---|
 | `web/tests/model.test.ts` | Model compiles for both platforms; every reference, AU and citation resolves; formatting |
-| `web/tests/engine.test.ts` | Prototype faces for every primary emotion; compounds; felt vs polite smiles; shame vs pride; PSPI; asymmetry fading; hysteresis; calibration; blinks; PERCLOS; yawns; brief expressions; no false labels on a noisy resting face; face loss |
+| `web/tests/engine.test.ts` | Prototype faces for every primary emotion; partial EMFACS fear faces (and that one action alone is not fear); compounds; felt vs polite smiles; shame vs pride; PSPI; asymmetry fading; pose-gated texture; hysteresis; calibration; personal range calibration; extended catalogue on/off; blinks; PERCLOS; yawns; brief expressions; no false labels on a noisy resting face; face loss |
 | `web/tests/geometry.test.ts` | Head pose recovered within 0.5° per axis; geometry invariant to rotation and scale; side naming |
 | `web/tests/golden.test.ts` | Engine output matches `model/fixtures/golden.json` |
 | `ios/EmotionEngine/Tests` | The Swift engine reproduces the golden outputs frame by frame (tolerance 1e-5) for a synthetic ARKit session and for real MediaPipe measurements |
-| `web/tests/e2e` (Playwright) | The production build in Chromium with a fake camera fed by the face video: camera starts, MediaPipe loads, faces tracked in all samples, several labels including happiness, calibration succeeds |
+| `web/tests/e2e` (Playwright) | The production build in Chromium with a fake camera fed by the face video: camera starts, MediaPipe loads, faces tracked in all samples, several labels including happiness, calibration succeeds, the extended catalogue appears when switched on |
 
 ## 6. Known weaknesses
 
 - **Uncalibrated anger and disgust** are weak with MediaPipe: brow lowering is hard
   to tell from low-set brows without a baseline, and the nose wrinkle has to be
   inferred from geometry. Calibrate, or use the native iOS app (TrueDepth).
+- **Brows on the web (MediaPipe)** are under-reported, especially brows raised and
+  drawn together (fear, worry). This limits fear most. The range calibration's
+  "raise your eyebrows" and "frown" steps scale up what is measured; the native iOS
+  app measures brows from depth.
 - **Occlusion** (hands on the face) is not detected and can produce odd readings.
 - **Head pose** beyond about ±30° degrades everything; asymmetry features are
   disabled beyond 30° of yaw.

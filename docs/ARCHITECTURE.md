@@ -47,7 +47,10 @@ Each platform adapter produces a flat `Record<string, number>` per frame:
   (`tex.glabellaLines`, change across the face between the brow heads). Both come
   from a ≤200 px crop of the camera frame read each frame, are normalised by the
   patch brightness and reported as logs, so a change from neutral is a contrast ratio.
-  They feed AU1/AU2 and AU4 (see `web/src/platform/mediapipe/texture.ts`).
+  They feed AU1/AU2 and AU4 (see `web/src/platform/mediapipe/texture.ts`). Their model
+  entries carry `poseGate: [6, 14]` — weight 1 within 6° of the baseline head pitch and
+  yaw, fading to 0 at 14°, because tilting the head changes forehead shading — and
+  `drift: 4`, letting the uncalibrated baseline find each camera's texture level.
 - **Head pose**, `pose.pitch/yaw/roll` in degrees: pitch > 0 is chin up, yaw > 0 is
   turned to the person's left, roll > 0 is tilted towards the left shoulder. On iOS,
   pitch and roll are relative to gravity, and yaw is relative to the phone.
@@ -111,7 +114,8 @@ score = clamp(core × (1 + 0.3·support) × Π(1 − w·inhibit), 0, 1)
 ```
 
 `s` (strictness) is set per tier: 0.5 for primary, 0.8 for compound (both
-components' actions must be present), 0.6 for cognitive and extended. The
+components' actions must be present), 0.6 for cognitive and extended. A variant can
+override it (fear's two partial EMFACS faces use 1, a strict AND). The
 expression's score is its best variant's score. Scores are smoothed (τ = 120 ms).
 
 The **extended** tier (triumph, frustration, anxiety, thinking, disappointment,

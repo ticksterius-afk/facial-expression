@@ -101,7 +101,7 @@ export class BaselineTracker implements BaselineView {
     if (!(dt > 0)) return;
     if (dt < 1) this.faceTime += dt;
     const a = this.cm.params.adapt;
-    const drift = this.calibratedFlag ? a.maxDriftCalibrated : a.maxDriftUncalibrated;
+    const calibrated = this.calibratedFlag;
     const tauUp = this.calibratedFlag ? a.lowTauUp : a.lowTauUp / 3;
     for (const m of this.cm.measurements) {
       const x = measurements[m.key];
@@ -116,7 +116,7 @@ export class BaselineTracker implements BaselineView {
         b += Math.abs(d) < step ? d : Math.sign(d) * step;
       }
       const anchor = this.anchors.get(m.key)!;
-      const lim = drift * m.scale;
+      const lim = (calibrated ? a.maxDriftCalibrated : m.drift ?? a.maxDriftUncalibrated) * m.scale;
       b = Math.min(anchor + lim, Math.max(anchor - lim, b));
       this.values.set(m.key, b);
     }

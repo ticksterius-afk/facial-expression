@@ -5,20 +5,30 @@ public typealias Features = [String: Double]
 /// AU channel intensity (mirrors web/src/engine/scoring.ts `channelValue`):
 ///   d = (x - baseline) - offset - sign(range) * deadzone
 ///   n = clamp(d / range * sensitivity, 0, 1);  AU = clamp(sum w * n, 0, 1)
-/// Missing measurements are dropped and positive weights renormalised.
+/// Missing measurements are dropped and positive weights renormalised; pose-gated
+/// measurements fade out as the head turns away from its baseline pose.
 func channelValue(_ ch: CompiledChannel, _ m: [String: Double], _ baseline: BaselineView, _ sensitivity: Double) -> Double {
     var sum = 0.0
     var availablePos = 0.0
     for t in ch.terms {
         guard let x = m[t.key], x.isFinite else { continue }
+        let w = t.gate.map { t.w * poseGateWeight($0, m, baseline) } ?? t.w
+        if w == 0 { continue }
         let dir = sign(t.r)
         let d = (x - baseline.value(t.key) - dir * baseline.deadzone(t.key)) * baseline.gain(t.key, dir) - t.o
         let n = clamp01((d / t.r) * sensitivity)
-        sum += t.w * n
-        if t.w > 0 { availablePos += t.w }
+        sum += w * n
+        if w > 0 { availablePos += w }
     }
     if availablePos <= 0 { return 0 }
     return clamp01(sum * (ch.posWeight / availablePos))
+}
+
+/// 1 while head pitch and yaw are within gate[0]° of their baselines, fading linearly to 0 at gate[1]°.
+func poseGateWeight(_ gate: [Double], _ m: [String: Double], _ baseline: BaselineView) -> Double {
+    guard let pitch = m["pose.pitch"], let yaw = m["pose.yaw"] else { return 1 }
+    let dev = max(abs(pitch - baseline.value("pose.pitch")), abs(yaw - baseline.value("pose.yaw")))
+    return clamp01(1 - (dev - gate[0]) / (gate[1] - gate[0]))
 }
 
 public func computeAUs(_ cm: CompiledModel, _ m: [String: Double], _ baseline: BaselineView, _ sensitivity: Double) -> Features {

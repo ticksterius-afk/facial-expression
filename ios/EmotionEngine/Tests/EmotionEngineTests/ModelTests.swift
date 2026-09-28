@@ -35,4 +35,25 @@ final class ModelTests: XCTestCase {
             XCTAssertEqual(best.id, id)
         }
     }
+
+    /// EMFACS partial fear faces (1+2+4+5, 5+20) count as fear only with both of their actions.
+    func testPartialFearFaces() throws {
+        let cm = try CompiledModel(model: loadModel(), platform: "arkit")
+        let base = DefaultBaseline(cm)
+        let primaries = cm.expressions.filter { $0.tier == "primary" }
+        func scores(_ face: [String: Double]) -> [String: Double] {
+            var f = computeAUs(cm, withGaze(cm, arkitFace(cm, face)), base, 1)
+            f["PERCLOS"] = 0; f["YAWN"] = 0; f["STILL"] = 1; f["BLINKS"] = 0
+            return Dictionary(uniqueKeysWithValues: primaries.map { ($0.id, scoreExpression(cm, $0, f)) })
+        }
+        let upperFace = ["browInnerUp": 0.65, "browOuterUp{S}": 0.4, "browDown{S}": 0.45, "eyeWide{S}": 0.6]
+        let eyesAndLips = ["eyeWide{S}": 0.6, "mouthStretch{S}": 0.6]
+        for face in [upperFace, eyesAndLips] {
+            let s = scores(face)
+            XCTAssertEqual(s.max { $0.value < $1.value }?.key, "fear", "\(face)")
+        }
+        for face in [["eyeWide{S}": 0.7], ["mouthStretch{S}": 0.7]] {
+            XCTAssertLessThan(scores(face)["fear"]!, cm.params.display.primaryMin, "\(face)")
+        }
+    }
 }

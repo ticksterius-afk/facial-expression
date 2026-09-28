@@ -72,7 +72,6 @@ public final class BaselineTracker: BaselineView {
         if !(dt > 0) { return }
         if dt < 1 { faceTime += dt }
         let a = cm.params.adapt
-        let drift = calibrated ? a.maxDriftCalibrated : a.maxDriftUncalibrated
         let tauUp = calibrated ? a.lowTauUp : a.lowTauUp / 3
         for m in cm.measurements {
             guard let x = measurements[m.key], x.isFinite else { continue }
@@ -86,7 +85,7 @@ public final class BaselineTracker: BaselineView {
                 b += abs(d) < step ? d : sign(d) * step
             }
             let anchor = anchors[m.key]!
-            let lim = drift * m.scale
+            let lim = (calibrated ? a.maxDriftCalibrated : m.drift ?? a.maxDriftUncalibrated) * m.scale
             b = min(anchor + lim, max(anchor - lim, b))
             values[m.key] = b
         }

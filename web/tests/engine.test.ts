@@ -77,6 +77,35 @@ describe("instantaneous scoring", () => {
     expect(full).toBeDefined();
   });
 
+  it("recognises the partial EMFACS fear faces, each only when both of its actions are present", () => {
+    const upperFace = { browInnerUp: 0.65, "browOuterUp{S}": 0.4, "browDown{S}": 0.45, "eyeWide{S}": 0.6 }; // 1+2+4+5
+    const eyesAndLips = { "eyeWide{S}": 0.6, "mouthStretch{S}": 0.6 }; // 5+20
+    for (const face of [upperFace, eyesAndLips] as Record<string, number>[]) {
+      const { scores } = EmotionEngine.evaluate(cm, arkitFace(face), base);
+      expect(topPrimary(scores), JSON.stringify(face)).toBe("fear");
+    }
+    // Strict AND: wide eyes alone, or stretched lips alone, are not fear.
+    for (const face of [{ "eyeWide{S}": 0.7 }, { "mouthStretch{S}": 0.7 }] as Record<string, number>[]) {
+      expect(EmotionEngine.evaluate(cm, arkitFace(face), base).scores.fear, JSON.stringify(face)).toBeLessThan(model.params.display.primaryMin);
+    }
+  });
+
+  it("rejects a variant strictness outside [0, 1]", () => {
+    const bad = structuredClone(model);
+    bad.expressions.find((e) => e.id === "fear")!.variants![1].strictness = 1.5;
+    expect(() => compileModel(bad, "arkit")).toThrow(/strictness/);
+  });
+
+  it("fades pose-gated texture out when the head turns away from its baseline pose", () => {
+    const mp = compileModel(model, "mediapipe");
+    const mb = new DefaultBaseline(mp);
+    const furrows = { ...restFace("mediapipe"), "tex.glabellaLines": mp.measurements.find((m) => m.key === "tex.glabellaLines")!.rest + 0.8 };
+    const frontal = EmotionEngine.evaluate(mp, furrows, mb).aus.AU4;
+    const tilted = EmotionEngine.evaluate(mp, { ...furrows, "pose.pitch": 20 }, mb).aus.AU4;
+    expect(frontal).toBeGreaterThan(0.2);
+    expect(tilted).toBe(0);
+  });
+
   it("treats one-sided actions as asymmetry (AU14U) but fades them out in profile views", () => {
     const frontal = EmotionEngine.evaluate(cm, arkitFace({ mouthDimpleLeft: 0.6 }), base).aus;
     const profile = EmotionEngine.evaluate(cm, arkitFace({ mouthDimpleLeft: 0.6, "pose.yaw": 40 }), base).aus;
@@ -112,6 +141,32 @@ describe("stateful engine", () => {
     r = run(e, r.t, 500, () => resting);
     expect(r.out.aus.AU4).toBeLessThan(0.05);
     expect(r.out.primary.id).toBe("neutral");
+  });
+
+  it("range calibration brings a person's small brow raise to full intensity", () => {
+    const rest = arkitFace({});
+    const weak = arkitFace({ browInnerUp: 0.3, "browOuterUp{S}": 0.25 });
+    const e = new EmotionEngine(model, "arkit");
+    e.startCalibration(0, 1);
+    let r = run(e, 0, 1100, () => rest);
+    r = run(e, r.t, 800, () => weak);
+    const before = r.out.aus.AU1;
+    e.startRangeStep(r.t, "brows_up");
+    r = run(e, r.t, (model.params.range.settleSec + model.params.range.holdSec) * 1000 + 100, () => weak);
+    const done = r.all.find((f) => f.range.result);
+    expect(done?.range.result).toBe("done");
+    expect(done?.range.updated).toContain("browInnerUp|+");
+    expect(e.baseline.gain("browInnerUp", 1)).toBeGreaterThan(1.5);
+    r = run(e, r.t, 800, () => weak);
+    expect(r.out.aus.AU1).toBeGreaterThan(before + 0.2);
+  });
+
+  it("scores the extended catalogue only when it is switched on", () => {
+    const sneer = arkitFace({ mouthUpperUpLeft: 0.6, noseSneerLeft: 0.45 });
+    const off = run(new EmotionEngine(model, "arkit"), 0, 600, () => sneer).out;
+    const on = run(new EmotionEngine(model, "arkit", { extended: true }), 0, 600, () => sneer).out;
+    expect(off.scores.sneer).toBe(0);
+    expect(on.scores.sneer).toBeGreaterThan(0.3);
   });
 
   it("fails calibration when no face is visible", () => {

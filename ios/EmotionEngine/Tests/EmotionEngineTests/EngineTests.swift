@@ -35,6 +35,37 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(events.map(\.tag), ["micro:surprise"])
     }
 
+    func testRangeCalibrationScalesSmallBrowRaise() throws {
+        let model = try loadModel()
+        let e = try EmotionEngine(model: model, platform: "arkit")
+        let rest = arkitFace(e.cm)
+        let weak = arkitFace(e.cm, ["browInnerUp": 0.3, "browOuterUp{S}": 0.25])
+        e.startCalibration(tMs: 0, durationSec: 1)
+        var r = run(e, from: 0, ms: 1100) { _ in rest }
+        r = run(e, from: r.t, ms: 800) { _ in weak }
+        let before = r.frames.last!.aus["AU1"]!
+        e.startRangeStep(tMs: r.t, stepId: "brows_up")
+        let p = e.cm.params.range
+        r = run(e, from: r.t, ms: (p.settleSec + p.holdSec) * 1000 + 100) { _ in weak }
+        let done = r.frames.compactMap(\.range).first { if case .done = $0 { return true } else { return false } }
+        guard case .done(let updated, _)? = done else { return XCTFail("range step did not finish") }
+        XCTAssertTrue(updated.contains("browInnerUp|+"))
+        XCTAssertGreaterThan(e.baseline.gain("browInnerUp", 1), 1.5)
+        r = run(e, from: r.t, ms: 800) { _ in weak }
+        XCTAssertGreaterThan(r.frames.last!.aus["AU1"]!, before + 0.2)
+    }
+
+    func testExtendedCatalogueOnlyWhenEnabled() throws {
+        let model = try loadModel()
+        let off = try EmotionEngine(model: model, platform: "arkit")
+        let on = try EmotionEngine(model: model, platform: "arkit", extended: true)
+        let sneer = arkitFace(off.cm, ["mouthUpperUpLeft": 0.6, "noseSneerLeft": 0.45])
+        let a = run(off, from: 0, ms: 600) { _ in sneer }.frames.last!
+        let b = run(on, from: 0, ms: 600) { _ in sneer }.frames.last!
+        XCTAssertEqual(a.scores["sneer"], 0)
+        XCTAssertGreaterThan(b.scores["sneer"]!, 0.3)
+    }
+
     func testFaceLossDecaysToNeutral() throws {
         let e = try EmotionEngine(model: loadModel(), platform: "arkit")
         var r = run(e, from: 0, ms: 1000) { _ in arkitFace(e.cm, ["mouthSmile{S}": 0.8, "cheekSquint{S}": 0.5]) }

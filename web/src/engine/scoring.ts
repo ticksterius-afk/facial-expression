@@ -14,6 +14,8 @@ export type Features = Record<string, number>;
  *
  * Missing measurements are dropped and the positive weights renormalised, so a
  * platform that lacks one input degrades gracefully instead of under-reporting.
+ * Pose-gated measurements count with a weight that fades out as the head turns
+ * away from its baseline pose (see poseGateWeight).
  */
 export function channelValue(
   ch: CompiledChannel,
@@ -26,14 +28,25 @@ export function channelValue(
   for (const t of ch.terms) {
     const x = measurements[t.key];
     if (x === undefined || !Number.isFinite(x)) continue;
+    const w = t.gate ? t.w * poseGateWeight(t.gate, measurements, baseline) : t.w;
+    if (w === 0) continue;
     const dir = Math.sign(t.r);
     const d = (x - baseline.get(t.key) - dir * baseline.deadzone(t.key)) * baseline.gain(t.key, dir) - t.o;
     const n = clamp01((d / t.r) * sensitivity);
-    sum += t.w * n;
-    if (t.w > 0) availablePos += t.w;
+    sum += w * n;
+    if (w > 0) availablePos += w;
   }
   if (availablePos <= 0) return 0;
   return clamp01(sum * (ch.posWeight / availablePos));
+}
+
+/** 1 while head pitch and yaw are within lo° of their baselines, fading linearly to 0 at hi°. */
+export function poseGateWeight(gate: readonly [number, number], measurements: Record<string, number>, baseline: BaselineView): number {
+  const pitch = measurements["pose.pitch"];
+  const yaw = measurements["pose.yaw"];
+  if (pitch === undefined || yaw === undefined) return 1;
+  const dev = Math.max(Math.abs(pitch - baseline.get("pose.pitch")), Math.abs(yaw - baseline.get("pose.yaw")));
+  return clamp01(1 - (dev - gate[0]) / (gate[1] - gate[0]));
 }
 
 /**

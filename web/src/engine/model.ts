@@ -27,6 +27,18 @@ export interface ModelMeasurement {
   /** Between-person spread of the neutral value; sets the dead-zone. */
   spread: number;
   mode: BaselineMode;
+  /**
+   * How far (× scale) the uncalibrated baseline may drift from `rest`; overrides
+   * params.adapt.maxDriftUncalibrated for signals whose resting level depends on
+   * the camera and lighting more than on the face (image texture).
+   */
+  drift?: number;
+  /**
+   * [lo, hi] degrees: the signal's weight fades from 1 to 0 as head pitch or yaw
+   * moves lo → hi away from its baseline. For image-based signals that head
+   * rotation changes by itself (shading and foreshortening of forehead texture).
+   */
+  poseGate?: [number, number];
 }
 
 export interface ModelSlot {
@@ -39,6 +51,8 @@ export interface ModelSlot {
 export interface ModelVariant {
   /** Short description of this configuration, e.g. "crying face". */
   name: string;
+  /** Overrides the tier's strictness, e.g. 0.9 for a two-action partial face whose actions must co-occur. */
+  strictness?: number;
   slots: ModelSlot[];
   support: ModelSlot[];
   inhibit: ModelSlot[];
@@ -146,6 +160,8 @@ export interface CompiledTerm {
   r: number;
   w: number;
   o: number;
+  /** The measurement's poseGate, if any. */
+  gate?: [number, number];
 }
 
 /** One AU output channel, e.g. "AU12L", "AU12R" or "AU17". */
@@ -178,7 +194,7 @@ export interface CompiledSlot {
 
 export interface CompiledVariant {
   name: string;
-  /** Weight of the geometric mean in the soft-AND (from params.strictness for the tier). */
+  /** Weight of the geometric mean in the soft-AND (the variant's own, else params.strictness for the tier). */
   strictness: number;
   slots: CompiledSlot[];
   support: CompiledSlot[];
@@ -220,10 +236,13 @@ export function compileModel(model: EmotionModel, platform: Platform): CompiledM
   const measurements: CompiledMeasurement[] = [];
   for (const [key, m] of Object.entries(p.measurements)) {
     if (!(m.scale > 0) || !(m.spread >= 0)) errors.push(`${platform}: measurement ${key} needs scale > 0 and spread >= 0`);
+    if (m.drift !== undefined && !(m.drift > 0)) errors.push(`${platform}: measurement ${key} drift must be > 0`);
+    if (m.poseGate !== undefined && !(m.poseGate.length === 2 && m.poseGate[0] >= 0 && m.poseGate[1] > m.poseGate[0])) errors.push(`${platform}: measurement ${key} poseGate must be [lo, hi] with 0 <= lo < hi`);
     const keys = key.includes("{S}") ? SIDES.map((s) => expandSide(key, s)) : [key];
     for (const k of keys) measurements.push({ key: k, ...m });
   }
   const measurementKeys = new Set(measurements.map((m) => m.key));
+  const gateOf = new Map(measurements.map((m) => [m.key, m.poseGate]));
 
   const auIds = Object.keys(model.aus);
   const bilateral = new Set(auIds.filter((a) => model.aus[a].bilateral));
@@ -239,7 +258,8 @@ export function compileModel(model: EmotionModel, platform: Platform): CompiledM
         const key = sideName ? expandSide(t.m, sideName) : t.m;
         if (!measurementKeys.has(key)) errors.push(`${platform}: ${au} references unknown measurement ${key}`);
         if (t.r === 0) errors.push(`${platform}: ${au} term ${t.m} has zero range`);
-        return { key, r: t.r, w: t.w, o: t.o ?? 0 };
+        const gate = gateOf.get(key);
+        return { key, r: t.r, w: t.w, o: t.o ?? 0, ...(gate ? { gate } : {}) };
       });
       channels.push({
         id: au + side,
@@ -284,9 +304,10 @@ export function compileModel(model: EmotionModel, platform: Platform): CompiledM
       const support = compileSlots(e.id, v.support);
       const inhibit = compileSlots(e.id, v.inhibit);
       for (const s of inhibit) if (s.w > 1) errors.push(`${e.id}: inhibit weight must be <= 1`);
+      if (v.strictness !== undefined && !(v.strictness >= 0 && v.strictness <= 1)) errors.push(`${e.id}/${v.name}: strictness must be in [0, 1]`);
       return {
         name: v.name,
-        strictness: model.params.strictness[e.tier],
+        strictness: v.strictness ?? model.params.strictness[e.tier],
         slots,
         support,
         inhibit,

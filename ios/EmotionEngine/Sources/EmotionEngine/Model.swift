@@ -16,6 +16,10 @@ public struct ModelMeasurement: Codable, Sendable {
     public let scale: Double
     public let spread: Double
     public let mode: String
+    /// Uncalibrated drift limit (× scale) overriding params.adapt.maxDriftUncalibrated.
+    public let drift: Double?
+    /// [lo, hi] degrees: weight fades 1 → 0 as head pitch or yaw leaves its baseline by lo → hi.
+    public let poseGate: [Double]?
 }
 
 public struct ModelSlot: Codable, Sendable {
@@ -26,6 +30,8 @@ public struct ModelSlot: Codable, Sendable {
 
 public struct ModelVariant: Codable, Sendable {
     public let name: String
+    /// Overrides the tier's strictness (e.g. for a partial face whose actions must co-occur).
+    public let strictness: Double?
     public let slots: [ModelSlot]
     public let support: [ModelSlot]
     public let inhibit: [ModelSlot]
@@ -163,6 +169,8 @@ public struct CompiledTerm: Sendable {
     public let r: Double
     public let w: Double
     public let o: Double
+    /// The measurement's poseGate [lo, hi] in degrees, if any.
+    public let gate: [Double]?
 }
 
 /// One AU output channel, e.g. "AU12L", "AU12R" or "AU17".
@@ -179,6 +187,7 @@ public struct CompiledMeasurement: Sendable {
     public let scale: Double
     public let spread: Double
     public let isLow: Bool
+    public let drift: Double?
 }
 
 public struct CompiledSlot: Sendable {
@@ -247,9 +256,19 @@ public struct CompiledModel: Sendable {
             let m = p.measurements[key]!
             if !(m.scale > 0) || !(m.spread >= 0) { errors.append("\(platform): measurement \(key) needs scale > 0 and spread >= 0") }
             let keys = key.contains("{S}") ? sides.map { expand(key, $0) } : [key]
-            for k in keys { measurements.append(CompiledMeasurement(key: k, rest: m.rest, scale: m.scale, spread: m.spread, isLow: m.mode == "low")) }
+            if let d = m.drift, !(d > 0) { errors.append("\(platform): measurement \(key) drift must be > 0") }
+            if let g = m.poseGate, !(g.count == 2 && g[0] >= 0 && g[1] > g[0]) {
+                errors.append("\(platform): measurement \(key) poseGate must be [lo, hi] with 0 <= lo < hi")
+            }
+            for k in keys { measurements.append(CompiledMeasurement(key: k, rest: m.rest, scale: m.scale, spread: m.spread, isLow: m.mode == "low", drift: m.drift)) }
         }
         let measurementKeys = Set(measurements.map(\.key))
+        var gateOf: [String: [Double]] = [:]
+        for key in p.measurements.keys {
+            guard let g = p.measurements[key]!.poseGate else { continue }
+            let keys = key.contains("{S}") ? sides.map { expand(key, $0) } : [key]
+            for k in keys { gateOf[k] = g }
+        }
 
         let auIds = model.aus.keys.sorted { auOrder($0) < auOrder($1) }
         let bilateral = auIds.filter { model.aus[$0]!.bilateral }
@@ -265,7 +284,7 @@ public struct CompiledModel: Sendable {
                     let key = sideName.map { expand(t.m, $0) } ?? t.m
                     if !measurementKeys.contains(key) { errors.append("\(platform): \(au) references unknown measurement \(key)") }
                     if t.r == 0 { errors.append("\(platform): \(au) term \(t.m) has zero range") }
-                    return CompiledTerm(key: key, r: t.r, w: t.w, o: t.o ?? 0)
+                    return CompiledTerm(key: key, r: t.r, w: t.w, o: t.o ?? 0, gate: gateOf[key])
                 }
                 channels.append(CompiledChannel(id: au + suffix, au: au, terms: ct, posWeight: ct.reduce(0) { $0 + max(0, $1.w) }))
             }
@@ -297,14 +316,15 @@ public struct CompiledModel: Sendable {
             if !(strictness >= 0 && strictness <= 1) { errors.append("\(e.id): params.strictness.\(e.tier) must be in [0, 1]") }
             for r in e.refs where model.references[r] == nil { errors.append("\(e.id): unknown reference \(r)") }
             if e.variants != nil && e.slots != nil { errors.append("\(e.id): use either variants or top-level slots") }
-            let raw = e.variants ?? [ModelVariant(name: "", slots: e.slots ?? [], support: e.support ?? [], inhibit: e.inhibit ?? [])]
+            let raw = e.variants ?? [ModelVariant(name: "", strictness: nil, slots: e.slots ?? [], support: e.support ?? [], inhibit: e.inhibit ?? [])]
             let variants: [CompiledVariant] = raw.map { v in
                 if v.slots.isEmpty { errors.append("\(e.id): every variant needs at least one slot") }
                 let slots = compileSlots(e.id, v.slots)
                 let support = compileSlots(e.id, v.support)
                 let inhibit = compileSlots(e.id, v.inhibit)
                 for s in inhibit where s.w > 1 { errors.append("\(e.id): inhibit weight must be <= 1") }
-                return CompiledVariant(name: v.name, strictness: strictness, slots: slots, support: support, inhibit: inhibit,
+                if let s = v.strictness, !(s >= 0 && s <= 1) { errors.append("\(e.id)/\(v.name): strictness must be in [0, 1]") }
+                return CompiledVariant(name: v.name, strictness: v.strictness ?? strictness, slots: slots, support: support, inhibit: inhibit,
                                        slotWeight: slots.reduce(0) { $0 + $1.w }, supportWeight: support.reduce(0) { $0 + $1.w })
             }
             expressions.append(CompiledExpression(id: e.id, tier: e.tier, name: e.name, emoji: e.emoji, gloss: e.gloss, cues: e.cues, refs: e.refs, variants: variants))

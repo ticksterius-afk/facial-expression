@@ -127,15 +127,20 @@ each category.
   forehead, and this AU1+2+4 combination is the key difference from surprise.
 - **Eyes:** upper lid raised (AU5), lower lid tensed.
 - **Mouth:** lips stretched horizontally (AU20); mouth often open.
-- **EMFACS:** 1+2+4+5+20 (+25/26/27), and also the partial faces 1+2+4, 1+2+5 (brows
-  raised with very wide eyes, no brow lowering) and 5+20 (wide eyes with stretched
-  lips). **Du et al.:** 1, 4, 20, 25 (variants 2, 5, 26).
+- **EMFACS:** 1+2+4+5+20 (+25/26/27), and also partial faces: the upper face alone
+  (1+2+4+5), wide eyes with stretched lips (5+20, ± an open mouth), and 1+2+5 with the
+  eyes opened to their maximum *and* the mouth open — which differs from surprise
+  (1+2+5 at low intensity + jaw drop) only in how wide the eyes are.
+  **Du et al.:** 1, 4, 20, 25 (variants 2, 5, 26).
 - Observers rely heavily on the widened eyes (Smith et al., 2005).
-- **In the app:** fear scores the best of three configurations: the full face, the
-  1+2+5 variant (which needs clearly wider eyes than surprise, and is argued against
-  by a dropped jaw, the surprise signature) and the 5+20 variant. Posed and
-  spontaneous fear often lacks AU4, and trackers under-report brow lowering during a
-  brow raise, so requiring all five actions made fear the hardest emotion to detect.
+- **What separates fear from surprise:** on labelled photos (see
+  [VALIDATION.md](VALIDATION.md)) the stretched lips (AU20), the lip corners pulled down
+  (AU15) and the glabella furrows of brows drawn together (AU4) separate them; wide
+  eyes on their own barely do, and the dropped jaw points to surprise.
+- **In the app:** fear scores the best of three configurations: the full face (a
+  soft AND that tolerates one weak action), and the partial faces 1+2+4+5 and 5+20,
+  each a strict AND (both or all actions must be present). The 1+2+5-maximum variant
+  is left out: with a phone camera it cannot be told apart from surprise.
 
 ### Anger
 - **Brows:** lowered and drawn together; vertical furrows (AU4). The central brow
@@ -260,9 +265,11 @@ furrows** at the glabella, between the brows. Early automatic AU detectors used
 exactly these “transient features” (Tian, Kanade & Cohn, 2001). The web app measures
 both from the camera image (the contrast of lines across a patch of forehead above the
 brows, and between the brow heads, relative to your neutral face) and adds them to
-AU1/AU2 and AU4 alongside the landmark and blendshape signals. The iPhone app gets the
-same information from the TrueDepth depth map, whose brow blendshapes already track
-the forehead surface.
+AU1/AU2 and AU4 alongside the landmark and blendshape signals. Tilting the head also
+changes the shading of the forehead, so these image measurements only count while the
+head is within a few degrees of its usual pose. The iPhone app gets the same
+information from the TrueDepth depth map, whose brow blendshapes already track the
+forehead surface.
 
 ---
 

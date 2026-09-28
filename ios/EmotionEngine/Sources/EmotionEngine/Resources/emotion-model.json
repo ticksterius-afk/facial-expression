@@ -1,5 +1,5 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "about": "Facial expression model: FACS Action Units estimated from face-tracking signals, and expression prototypes defined over those AUs. Shared by the web (TypeScript) and iOS (Swift) engines. See docs/RESEARCH.md for the evidence behind every prototype and docs/ARCHITECTURE.md for the scoring maths.",
   "params": {
     "evidence": [0.1, 0.55],
@@ -119,12 +119,14 @@
         "pose.yaw": { "rest": 0, "scale": 25, "spread": 16.7, "mode": "median" },
         "pose.roll": { "rest": 0, "scale": 15, "spread": 8.3, "mode": "median" },
         "gaze.yaw": { "rest": 0, "scale": 25, "spread": 10, "mode": "median" },
-        "gaze.pitch": { "rest": 0, "scale": 20, "spread": 10, "mode": "median" }
+        "gaze.pitch": { "rest": 0, "scale": 20, "spread": 10, "mode": "median" },
+        "tex.foreheadLines": { "rest": -4.2, "scale": 0.6, "spread": 0.35, "mode": "low", "drift": 4, "poseGate": [6, 14] },
+        "tex.glabellaLines": { "rest": -3.85, "scale": 0.5, "spread": 0.3, "mode": "low", "drift": 4, "poseGate": [6, 14] }
       },
       "recipes": {
-        "AU1": [{ "m": "browInnerUp", "r": 0.55, "w": 0.7 }, { "m": "geo.browInnerHeight{S}", "r": 0.11, "w": 0.3 }],
-        "AU2": [{ "m": "browOuterUp{S}", "r": 0.55, "w": 0.7 }, { "m": "geo.browOuterHeight{S}", "r": 0.09, "w": 0.3 }],
-        "AU4": [{ "m": "browDown{S}", "r": 0.4, "w": 0.5 }, { "m": "geo.browMidHeight{S}", "r": -0.08, "w": 0.25 }, { "m": "geo.browGap", "r": -0.045, "w": 0.25 }],
+        "AU1": [{ "m": "browInnerUp", "r": 0.55, "w": 0.56 }, { "m": "geo.browInnerHeight{S}", "r": 0.11, "w": 0.24 }, { "m": "tex.foreheadLines", "r": 0.5, "w": 0.2 }],
+        "AU2": [{ "m": "browOuterUp{S}", "r": 0.55, "w": 0.56 }, { "m": "geo.browOuterHeight{S}", "r": 0.09, "w": 0.24 }, { "m": "tex.foreheadLines", "r": 0.5, "w": 0.2 }],
+        "AU4": [{ "m": "browDown{S}", "r": 0.4, "w": 0.35 }, { "m": "geo.browMidHeight{S}", "r": -0.08, "w": 0.175 }, { "m": "geo.browGap", "r": -0.045, "w": 0.175 }, { "m": "tex.glabellaLines", "r": 0.4, "w": 0.3 }],
         "AU5": [{ "m": "eyeWide{S}", "r": 0.07, "w": 0.6 }, { "m": "geo.eyeOpen{S}", "r": 0.14, "w": 0.4 }],
         "AU6": [{ "m": "geo.cheekHeight{S}", "r": 0.075, "w": 0.6 }, { "m": "geo.lowerLidHeight{S}", "r": 0.026, "w": 0.4 }],
         "AU7": [{ "m": "eyeSquint{S}", "r": 0.3, "w": 0.5 }, { "m": "geo.eyeOpen{S}", "r": -0.12, "w": 0.25 }, { "m": "geo.lowerLidHeight{S}", "r": 0.026, "w": 0.25 }],
@@ -293,26 +295,28 @@
       "name": "Fear",
       "emoji": "😨",
       "gloss": "Threat, alarm, anticipation of harm.",
-      "cues": "Brows raised and pulled together (wrinkles only in the centre of the forehead); upper lids raised high, lower lids tensed; lips stretched back horizontally, mouth often open. EMFACS also lists brows raised with very wide eyes (1+2+5), and wide eyes with stretched lips (5+20).",
+      "cues": "Brows raised and pulled together (wrinkles only in the centre of the forehead, furrows between the brows); upper lids raised high, lower lids tensed; lips stretched back horizontally, mouth often open. EMFACS also accepts the upper face alone (1+2+4+5) and wide eyes with stretched lips (5+20).",
       "refs": ["ekman-friesen-1975", "ekman-friesen-hager-2002", "du-2014", "smith-2005", "wegrzyn-2017"],
       "variants": [
         {
           "name": "full fear face (1+2+4+5+20)",
-          "slots": [{ "any": ["AU1", "AU2"], "w": 0.8 }, { "any": ["AU4"], "w": 0.4 }, { "any": ["AU5"], "w": 1 }, { "any": ["AU20"], "w": 0.8 }, { "any": ["AU25", "AU26", "AU27"], "w": 0.4 }],
+          "slots": [{ "any": ["AU1", "AU2"], "w": 0.8 }, { "any": ["AU4"], "w": 0.6 }, { "any": ["AU5"], "w": 1 }, { "any": ["AU20"], "w": 0.8 }, { "any": ["AU25", "AU26", "AU27"], "w": 0.4 }],
           "support": [{ "any": ["AU1"], "w": 0.5 }, { "any": ["AU15"], "w": 0.2 }],
-          "inhibit": [{ "any": ["AU12B"], "w": 0.6 }]
+          "inhibit": [{ "any": ["AU12"], "w": 0.6 }]
         },
         {
-          "name": "raised brows, very wide eyes (1+2+5)",
-          "slots": [{ "any": ["AU1"], "w": 0.8 }, { "any": ["AU2"], "w": 0.5 }, { "any": ["AU5"], "w": 1, "t": [0.3, 0.75] }],
-          "support": [{ "any": ["AU4"], "w": 0.5 }, { "any": ["AU20"], "w": 0.5 }],
-          "inhibit": [{ "any": ["AU12B"], "w": 0.6 }, { "any": ["AU26", "AU27"], "w": 0.5 }]
+          "name": "brows raised and drawn together, eyes wide (1+2+4+5)",
+          "strictness": 1,
+          "slots": [{ "any": ["AU1"], "w": 0.8 }, { "any": ["AU4"], "w": 0.7 }, { "any": ["AU5"], "w": 0.8 }],
+          "support": [{ "any": ["AU2"], "w": 0.4 }, { "any": ["AU20"], "w": 0.5 }, { "any": ["AU25", "AU26"], "w": 0.2 }],
+          "inhibit": [{ "any": ["AU12"], "w": 0.6 }]
         },
         {
           "name": "wide eyes, stretched lips (5+20)",
+          "strictness": 1,
           "slots": [{ "any": ["AU5"], "w": 1 }, { "any": ["AU20"], "w": 1 }],
-          "support": [{ "any": ["AU1", "AU2"], "w": 0.4 }, { "any": ["AU25", "AU26"], "w": 0.3 }, { "any": ["AU4"], "w": 0.3 }],
-          "inhibit": [{ "any": ["AU12B"], "w": 0.6 }]
+          "support": [{ "any": ["AU1", "AU2"], "w": 0.4 }, { "any": ["AU25", "AU26"], "w": 0.3 }, { "any": ["AU4"], "w": 0.3 }, { "any": ["AU15"], "w": 0.3 }],
+          "inhibit": [{ "any": ["AU12"], "w": 0.6 }]
         }
       ]
     },
@@ -789,12 +793,12 @@
     {
       "id": "brows_up",
       "prompt": "Raise your eyebrows as high as you can",
-      "targets": [{ "m": "browInnerUp", "dir": 1 }, { "m": "browOuterUp{S}", "dir": 1 }, { "m": "geo.browInnerHeight{S}", "dir": 1 }, { "m": "geo.browMidHeight{S}", "dir": 1 }, { "m": "geo.browOuterHeight{S}", "dir": 1 }]
+      "targets": [{ "m": "browInnerUp", "dir": 1 }, { "m": "browOuterUp{S}", "dir": 1 }, { "m": "geo.browInnerHeight{S}", "dir": 1 }, { "m": "geo.browMidHeight{S}", "dir": 1 }, { "m": "geo.browOuterHeight{S}", "dir": 1 }, { "m": "tex.foreheadLines", "dir": 1 }]
     },
     {
       "id": "brows_down",
       "prompt": "Frown hard — pull your eyebrows down and together",
-      "targets": [{ "m": "browDown{S}", "dir": 1 }, { "m": "geo.browMidHeight{S}", "dir": -1 }, { "m": "geo.browInnerHeight{S}", "dir": -1 }, { "m": "geo.browGap", "dir": -1 }]
+      "targets": [{ "m": "browDown{S}", "dir": 1 }, { "m": "geo.browMidHeight{S}", "dir": -1 }, { "m": "geo.browInnerHeight{S}", "dir": -1 }, { "m": "geo.browGap", "dir": -1 }, { "m": "tex.glabellaLines", "dir": 1 }]
     },
     {
       "id": "eyes_wide",
