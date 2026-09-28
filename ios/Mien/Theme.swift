@@ -26,6 +26,7 @@ enum Theme {
         case "social": return good
         case "cognitive": return warn
         case "physical": return bad
+        case "extended": return Color(red: 0.690, green: 0.525, blue: 1.0)
         default: return accent
         }
     }

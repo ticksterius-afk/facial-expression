@@ -76,6 +76,8 @@ public struct ModelParams: Codable, Sendable {
     public struct Perclos: Codable, Sendable { public let windowSec, closed, maxSqueeze: Double }
     public struct Yawn: Codable, Sendable { public let open, startSec, fullSec, holdSec: Double }
     public struct Stillness: Codable, Sendable { public let tau, degPerSec: Double }
+    public struct BlinkRate: Codable, Sendable { public let lo, hi: Double }
+    public struct Range: Codable, Sendable { public let settleSec, holdSec, minFraction, gainMin, gainMax: Double }
 
     public let evidence: [Double]
     public let floor: Double
@@ -93,6 +95,19 @@ public struct ModelParams: Codable, Sendable {
     public let perclos: Perclos
     public let yawn: Yawn
     public let stillness: Stillness
+    public let blinkRate: BlinkRate
+    public let range: Range
+}
+
+/// One guided maximal expression used to learn a person's range of movement.
+public struct ModelRangeStep: Codable, Sendable {
+    public struct Target: Codable, Sendable {
+        public let m: String
+        public let dir: Int
+    }
+    public let id: String
+    public let prompt: String
+    public let targets: [Target]
 }
 
 public struct PlatformSpec: Codable, Sendable {
@@ -116,6 +131,7 @@ public struct EmotionModel: Codable, Sendable {
     public let platforms: [String: PlatformSpec]
     public let tiers: [String: String]
     public let expressions: [ModelExpression]
+    public let rangeSteps: [ModelRangeStep]
     public let references: [String: String]
 
     public static func load(from data: Data) throws -> EmotionModel {
@@ -193,7 +209,19 @@ public struct CompiledExpression: Sendable {
     public let variants: [CompiledVariant]
 }
 
-public let temporalFeatures = ["PERCLOS", "YAWN", "STILL"]
+public struct CompiledRangeStep: Sendable {
+    public struct Target: Sendable {
+        public let key: String
+        public let dir: Double
+        public let scale: Double
+    }
+    public let id: String
+    public let prompt: String
+    /// Targets available on this platform, sides expanded.
+    public let targets: [Target]
+}
+
+public let temporalFeatures = ["PERCLOS", "YAWN", "STILL", "BLINKS"]
 let sides = ["Left", "Right"]
 
 public struct CompiledModel: Sendable {
@@ -206,6 +234,8 @@ public struct CompiledModel: Sendable {
     public let bilateral: [String]
     public let expressions: [CompiledExpression]
     public let byId: [String: CompiledExpression]
+    /// Guided range-calibration steps, restricted to this platform's measurements.
+    public let rangeSteps: [CompiledRangeStep]
 
     public init(model: EmotionModel, platform: String) throws {
         guard let p = model.platforms[platform] else { throw ModelError.invalid(["Model has no platform \"\(platform)\""]) }
@@ -280,6 +310,25 @@ public struct CompiledModel: Sendable {
             expressions.append(CompiledExpression(id: e.id, tier: e.tier, name: e.name, emoji: e.emoji, gloss: e.gloss, cues: e.cues, refs: e.refs, variants: variants))
         }
         for au in auIds where model.regions[model.aus[au]!.region] == nil { errors.append("\(au): unknown region") }
+
+        // Range steps: expand sides and keep only measurements this platform has.
+        var scaleOf: [String: Double] = [:]
+        for m in measurements { scaleOf[m.key] = m.scale }
+        let templates = Set(p.measurements.keys)
+        let allTemplates = Set(model.platforms.values.flatMap { $0.measurements.keys })
+        var rangeSteps: [CompiledRangeStep] = []
+        for step in model.rangeSteps {
+            var targets: [CompiledRangeStep.Target] = []
+            for t in step.targets {
+                if t.dir != 1 && t.dir != -1 { errors.append("range step \(step.id): dir must be 1 or -1") }
+                if !allTemplates.contains(t.m) { errors.append("range step \(step.id): unknown measurement \(t.m)") }
+                if !templates.contains(t.m) { continue }
+                let keys = t.m.contains("{S}") ? sides.map { expand(t.m, $0) } : [t.m]
+                for key in keys { targets.append(CompiledRangeStep.Target(key: key, dir: Double(t.dir), scale: scaleOf[key]!)) }
+            }
+            rangeSteps.append(CompiledRangeStep(id: step.id, prompt: step.prompt, targets: targets))
+        }
+
         if !errors.isEmpty { throw ModelError.invalid(errors) }
 
         self.model = model
@@ -290,6 +339,7 @@ public struct CompiledModel: Sendable {
         self.bilateral = bilateral
         self.expressions = expressions
         self.byId = Dictionary(uniqueKeysWithValues: expressions.map { ($0.id, $0) })
+        self.rangeSteps = rangeSteps
     }
 }
 

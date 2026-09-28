@@ -17,6 +17,8 @@ struct LoggedEvent: Identifiable {
 /// lower rate to keep the UI smooth.
 final class FaceTracker: NSObject, ObservableObject, ARSessionDelegate {
     static let calibrationKey = "calibration.arkit"
+    static let gainsKey = "gains.arkit"
+    static let extendedKey = "extended"
 
     let session = ARSession()
     let engine: EmotionEngine
@@ -26,6 +28,10 @@ final class FaceTracker: NSObject, ObservableObject, ARSessionDelegate {
     @Published private(set) var calibrating = false
     @Published private(set) var calibrationProgress = 0.0
     @Published private(set) var lastCalibration: BaselineTracker.CalibrationStep?
+    /// Index into `rangeSteps` while the personal range calibration runs.
+    @Published private(set) var rangeIndex: Int?
+    @Published private(set) var rangeProgress = 0.0
+    @Published var rangeSummary: String?
     @Published private(set) var events: [LoggedEvent] = []
     @Published private(set) var timeline: [(t: TimeInterval, id: String)] = []
     @Published private(set) var fps = 0.0
@@ -33,12 +39,15 @@ final class FaceTracker: NSObject, ObservableObject, ARSessionDelegate {
 
     private var lastPublish: TimeInterval = 0
     private var lastFrameTime: TimeInterval = 0
+    private var rangeUpdated = 0
+    private var rangeWeak: [String] = []
 
     override init() {
         let model: EmotionModel
         do {
             model = try EmotionModel.bundled()
-            engine = try EmotionEngine(model: model, platform: "arkit")
+            engine = try EmotionEngine(model: model, platform: "arkit",
+                                       extended: UserDefaults.standard.bool(forKey: Self.extendedKey))
         } catch {
             fatalError("Bundled emotion model is invalid: \(error)")
         }
@@ -47,12 +56,29 @@ final class FaceTracker: NSObject, ObservableObject, ARSessionDelegate {
         if let saved = UserDefaults.standard.dictionary(forKey: Self.calibrationKey) as? [String: Double] {
             engine.baseline.setCalibration(saved)
         }
+        if let gains = UserDefaults.standard.dictionary(forKey: Self.gainsKey) as? [String: Double] {
+            engine.baseline.setGains(gains)
+        }
     }
 
     var sensitivity: Double {
         get { engine.sensitivity }
         set { engine.sensitivity = newValue }
     }
+
+    /// Whether the extended catalogue (triumph, frustration, anxiety, …) is scored and listed.
+    var extended: Bool {
+        get { engine.extended }
+        set {
+            engine.extended = newValue
+            UserDefaults.standard.set(newValue, forKey: Self.extendedKey)
+            objectWillChange.send()
+        }
+    }
+
+    /// Guided maximal expressions that teach the engine how far this face moves.
+    var rangeSteps: [CompiledRangeStep] { engine.cm.rangeSteps.filter { !$0.targets.isEmpty } }
+    var hasRangeGains: Bool { !engine.baseline.rangeGains().isEmpty }
 
     func start() {
         guard supported else { return }
@@ -80,8 +106,60 @@ final class FaceTracker: NSObject, ObservableObject, ARSessionDelegate {
 
     func forgetCalibration() {
         engine.baseline.reset()
+        engine.baseline.resetGains()
         UserDefaults.standard.removeObject(forKey: Self.calibrationKey)
+        UserDefaults.standard.removeObject(forKey: Self.gainsKey)
         objectWillChange.send()
+    }
+
+    // MARK: Personal range calibration
+
+    func beginRange() {
+        rangeUpdated = 0
+        rangeWeak = []
+        rangeSummary = nil
+        rangeIndex = 0
+        startRangeStep()
+    }
+
+    func stopRange() { finishRange(completed: false) }
+
+    private func startRangeStep() {
+        guard let i = rangeIndex else { return }
+        rangeProgress = 0
+        engine.startRangeStep(tMs: lastFrameTime * 1000, stepId: rangeSteps[i].id)
+    }
+
+    private func finishRange(completed: Bool) {
+        engine.baseline.cancelRangeStep()
+        guard rangeIndex != nil else { return }
+        rangeIndex = nil
+        rangeProgress = 0
+        UserDefaults.standard.set(engine.baseline.rangeGains(), forKey: Self.gainsKey)
+        guard completed else { return }
+        rangeSummary = rangeWeak.isEmpty
+            ? "Range calibrated — \(rangeUpdated) signals tuned to your face."
+            : "Range calibrated (\(rangeUpdated) signals). Little movement seen for: \(rangeWeak.joined(separator: "; "))."
+    }
+
+    private func handleRange(_ out: FrameResult) {
+        guard let i = rangeIndex, let state = out.range else { return }
+        switch state {
+        case .progress(let p):
+            rangeProgress = p
+            return
+        case .done(let updated, let weak):
+            rangeUpdated += updated.count
+            if !weak.isEmpty { rangeWeak.append(rangeSteps[i].prompt) }
+        case .failed:
+            break
+        }
+        if i + 1 < rangeSteps.count {
+            rangeIndex = i + 1
+            startRangeStep()
+        } else {
+            finishRange(completed: true)
+        }
     }
 
     // MARK: ARSessionDelegate (delivered on the main queue)
@@ -109,6 +187,7 @@ final class FaceTracker: NSObject, ObservableObject, ARSessionDelegate {
 
     private func handle(_ out: FrameResult, at t: TimeInterval) {
         for ev in out.events { log(ev) }
+        handleRange(out)
         if calibrating {
             calibrationProgress = out.calibrationProgress
             if let result = out.calibrationResult {

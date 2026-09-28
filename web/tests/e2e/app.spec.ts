@@ -22,8 +22,14 @@ test("starts the camera, loads the face model and runs the engine", async ({ pag
   await expect(page.locator("#calib")).toBeVisible();
   await page.getByRole("button", { name: "Not now" }).click();
   await expect(page.locator("#calib")).toBeHidden();
-  // Panels render every expression and AU.
-  await expect(page.locator("#tab-emotions .row")).toHaveCount(38);
+  // Panels render every expression and AU; the extended catalogue is hidden until enabled.
+  await expect(page.locator("#tab-emotions .row")).toHaveCount(44);
+  await expect(page.locator("#tab-emotions .row:visible")).toHaveCount(38);
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByLabel("Extended emotion catalogue").check();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#tab-emotions .row:visible")).toHaveCount(44);
+  expect(await page.evaluate(() => (window as unknown as { __mien: { engine: { extended: boolean } } }).__mien.engine.extended)).toBe(true);
   await page.getByRole("tab", { name: "Face" }).click();
   await expect(page.locator("#tab-face .row.au").first()).toBeVisible();
   await page.getByRole("tab", { name: "Log" }).click();

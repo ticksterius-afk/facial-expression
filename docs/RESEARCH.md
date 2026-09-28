@@ -127,8 +127,15 @@ each category.
   forehead, and this AU1+2+4 combination is the key difference from surprise.
 - **Eyes:** upper lid raised (AU5), lower lid tensed.
 - **Mouth:** lips stretched horizontally (AU20); mouth often open.
-- **EMFACS:** 1+2+4+5+20 (+25/26/27). **Du et al.:** 1, 4, 20, 25 (variants 2, 5, 26).
+- **EMFACS:** 1+2+4+5+20 (+25/26/27), and also the partial faces 1+2+4, 1+2+5 (brows
+  raised with very wide eyes, no brow lowering) and 5+20 (wide eyes with stretched
+  lips). **Du et al.:** 1, 4, 20, 25 (variants 2, 5, 26).
 - Observers rely heavily on the widened eyes (Smith et al., 2005).
+- **In the app:** fear scores the best of three configurations: the full face, the
+  1+2+5 variant (which needs clearly wider eyes than surprise, and is argued against
+  by a dropped jaw, the surprise signature) and the 5+20 variant. Posed and
+  spontaneous fear often lacks AU4, and trackers under-report brow lowering during a
+  brow raise, so requiring all five actions made fear the hardest emotion to detect.
 
 ### Anger
 - **Brows:** lowered and drawn together; vertical furrows (AU4). The central brow
@@ -226,6 +233,37 @@ frequent expressions were not the basic six but confusion, concentration and wor
 all built on brow lowering (AU4). This is why the app treats a lone AU4 as
 concentration rather than anger.
 
+### Extended catalogue (optional)
+
+Six more states have published facial evidence that is thinner or more
+context-dependent than the list above. They are off by default and can be switched
+on in Settings (“Extended emotion catalogue”):
+
+| State | Evidence | Configuration used |
+|---|---|---|
+| **Triumph** | Matsumoto & Hwang (2012), spontaneous displays of Olympic winners; Cordaro et al. (2018) | Mouth wide open as in a shout, head tilted back, a grimace or grin (AU4/10/20/12) |
+| **Frustration** | Craig et al. (2008); Grafsgaard et al. (2013) | Brows raised (AU1+2) with lip corners tightened (AU14) or lips pressed (AU23/24) |
+| **Anxiety** | Harrigan & O'Connell (1996) | Low-intensity fear elements (AU1/2/20), frequent blinking, lips pressed or sucked in; no felt smile |
+| **Thinking** | Glenberg et al. (1998); Doherty-Sneddon & Phelps (2005) | Gaze averted while the head stays still and the face is calm — looking away frees up effort for a hard question |
+| **Disappointment** | Ekman & Friesen (1975) on the partial sadness face | A pout: lip corners down (AU15) and chin raised (AU17) without the raised inner brows of full sadness |
+| **Sneer** | Ekman & Friesen (1975); Rozin et al. (1994) | Upper lip raised (and nose wrinkled) on one side only (unilateral AU10/9) |
+
+Blink rate enters anxiety as a feature: people blink about 15–20 times a minute at
+rest and more under stress, so the app maps 22→40 blinks per minute onto 0→1.
+
+### The forehead
+
+The frontalis muscle raises the brows (AU1, AU2) by pulling the forehead skin up,
+and FACS coders read those actions as much from the **horizontal forehead wrinkles**
+they create as from the brow position; lowering the brows (AU4) cuts **vertical
+furrows** at the glabella, between the brows. Early automatic AU detectors used
+exactly these “transient features” (Tian, Kanade & Cohn, 2001). The web app measures
+both from the camera image (the contrast of lines across a patch of forehead above the
+brows, and between the brow heads, relative to your neutral face) and adds them to
+AU1/AU2 and AU4 alongside the landmark and blendshape signals. The iPhone app gets the
+same information from the TrueDepth depth map, whose brow blendshapes already track
+the forehead surface.
+
 ---
 
 ## 6. Time matters: dynamics and brief expressions
@@ -291,9 +329,11 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the maths and
 
 - Barrett, L. F., Adolphs, R., Marsella, S., Martinez, A. M., & Pollak, S. D. (2019). Emotional expressions reconsidered: Challenges to inferring emotion from human facial movements. *Psychological Science in the Public Interest, 20*(1), 1–68.
 - Cordaro, D. T., Sun, R., Keltner, D., Kamble, S., Huddar, N., & McNeil, G. (2018). Universals and cultural variations in 22 emotional expressions across five cultures. *Emotion, 18*(1), 75–93.
+- Craig, S. D., D'Mello, S., Witherspoon, A., & Graesser, A. (2008). Emote aloud during learning with AutoTutor: Applying the Facial Action Coding System to cognitive–affective states during learning. *Cognition and Emotion, 22*(5), 777–788.
 - Darwin, C. (1872). *The Expression of the Emotions in Man and Animals.* John Murray.
 - D'Mello, S. K., & Graesser, A. C. (2010). Multimodal semi-automated affect detection from conversational cues, gross body language, and facial features. *User Modeling and User-Adapted Interaction, 20*, 147–187.
 - Dinges, D. F., Mallis, M. M., Maislin, G., & Powell, J. W. (1998). *Evaluation of techniques for ocular measurement as an index of fatigue and the basis for alertness management* (DOT HS 808 762). NHTSA.
+- Doherty-Sneddon, G., & Phelps, F. G. (2005). Gaze aversion: A response to cognitive or social difficulty? *Memory & Cognition, 33*, 727–733.
 - Du, S., Tao, Y., & Martinez, A. M. (2014). Compound facial expressions of emotion. *PNAS, 111*(15), E1454–E1462.
 - Duchenne de Boulogne, G.-B. (1862/1990). *The Mechanism of Human Facial Expression.* Cambridge University Press.
 - Ekman, P. (1979). About brows: Emotional and conversational signals. In M. von Cranach et al. (Eds.), *Human Ethology* (pp. 169–202). Cambridge University Press.
@@ -304,13 +344,17 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the maths and
 - Ekman, P., & Friesen, W. V. (1986). A new pan-cultural facial expression of emotion. *Motivation and Emotion, 10*, 159–168.
 - Ekman, P., Friesen, W. V., & Hager, J. C. (2002). *Facial Action Coding System: The Manual and Investigator's Guide.* Research Nexus.
 - Girard, J. M., Cohn, J. F., Yin, L., & Morency, L.-P. (2021). Reconsidering the Duchenne smile: Formalizing and testing hypotheses about eye constriction and positive emotion. *Affective Science, 2*, 32–47.
+- Glenberg, A. M., Schroeder, J. L., & Robertson, D. A. (1998). Averting the gaze disengages the environment and facilitates remembering. *Memory & Cognition, 26*, 651–658.
 - Grafsgaard, J. F., Boyer, K. E., & Lester, J. C. (2011). Predicting facial indicators of confusion with hidden Markov models. *Affective Computing and Intelligent Interaction.*
+- Grafsgaard, J. F., Wiggins, J. B., Boyer, K. E., Wiebe, E. N., & Lester, J. C. (2013). Automatically recognizing facial expression: Predicting engagement and frustration. *Proceedings of Educational Data Mining 2013.*
+- Harrigan, J. A., & O'Connell, D. M. (1996). How do you look when feeling anxious? Facial displays of anxiety. *Personality and Individual Differences, 21*, 205–212.
 - Jack, R. E., Garrod, O. G. B., Yu, H., Caldara, R., & Schyns, P. G. (2012). Facial expressions of emotion are not culturally universal. *PNAS, 109*, 7241–7244.
 - Keltner, D. (1995). Signs of appeasement: Evidence for the distinct displays of embarrassment, amusement, and shame. *Journal of Personality and Social Psychology, 68*, 441–454.
 - Keltner, D., & Buswell, B. N. (1997). Embarrassment: Its distinct form and appeasement functions. *Psychological Bulletin, 122*, 250–270.
 - Keltner, D., & Cordaro, D. T. (2017). Understanding multimodal emotional expressions. In J.-M. Fernández-Dols & J. A. Russell (Eds.), *The Science of Facial Expression.* Oxford University Press.
 - Krumhuber, E. G., & Manstead, A. S. R. (2009). Can Duchenne smiles be feigned? New evidence on felt and false smiles. *Emotion, 9*, 807–820.
 - Matsumoto, D., & Ekman, P. (2004). The relationship among expressions, labels, and descriptions of contempt. *Journal of Personality and Social Psychology, 87*, 529–540.
+- Matsumoto, D., & Hwang, H. S. (2012). Evidence for a nonverbal expression of triumph. *Evolution and Human Behavior, 33*, 520–529.
 - Messinger, D. S., Mattson, W. I., Mahoor, M. H., & Cohn, J. F. (2012). The eyes have it: Making positive expressions more positive and negative expressions more negative. *Emotion, 12*(3), 430–436.
 - Plutchik, R. (1980). *Emotion: A Psychoevolutionary Synthesis.* Harper & Row.
 - Prkachin, K. M. (1992). The consistency of facial expressions of pain. *Pain, 51*, 297–306.
@@ -320,6 +364,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the maths and
 - Rozin, P., & Cohen, A. B. (2003). High frequency of facial expressions corresponding to confusion, concentration, and worry in an analysis of naturally occurring facial expressions of Americans. *Emotion, 3*, 68–75.
 - Rozin, P., Lowery, L., & Ebert, R. (1994). Varieties of disgust faces and the structure of disgust. *Journal of Personality and Social Psychology, 66*, 870–881.
 - Smith, M. L., Cottrell, G. W., Gosselin, F., & Schyns, P. G. (2005). Transmitting and decoding facial expressions. *Psychological Science, 16*, 184–189.
+- Tian, Y.-L., Kanade, T., & Cohn, J. F. (2001). Recognizing action units for facial expression analysis. *IEEE Transactions on Pattern Analysis and Machine Intelligence, 23*(2), 97–115.
 - Tracy, J. L., & Matsumoto, D. (2008). The spontaneous expression of pride and shame: Evidence for biologically innate nonverbal displays. *PNAS, 105*, 11655–11660.
 - Tracy, J. L., & Robins, R. W. (2004). Show your pride: Evidence for a discrete emotion expression. *Psychological Science, 15*, 194–197.
 - Wegrzyn, M., Vogt, M., Kireclioglu, B., Schneider, J., & Kissler, J. (2017). Mapping the emotional face: How individual face parts contribute to successful emotion recognition. *PLoS ONE, 12*(5), e0177239.

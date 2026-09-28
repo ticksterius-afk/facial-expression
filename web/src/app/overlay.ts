@@ -17,9 +17,21 @@ const CHEEK_POINTS = [116, 117, 123, 147, 345, 346, 352, 376];
 const OVAL = FaceLandmarker.FACE_LANDMARKS_FACE_OVAL;
 const IRIS = [...FaceLandmarker.FACE_LANDMARKS_LEFT_IRIS, ...FaceLandmarker.FACE_LANDMARKS_RIGHT_IRIS];
 
+/**
+ * Forehead: three lines where frontalis (AU1/AU2) wrinkles form, interpolated
+ * between the brow tops, the mid-forehead row and the top of the face oval
+ * (matched point for point, subject's right to left).
+ */
+const BROW_TOP = [70, 63, 105, 107, 9, 336, 334, 293, 300];
+const FOREHEAD_MID = [68, 104, 69, 108, 151, 337, 299, 333, 298];
+const FOREHEAD_TOP = [54, 103, 67, 109, 10, 338, 297, 332, 284];
+/** Glabella: the vertical furrows AU4 cuts between the inner brow heads [lower, upper] per side. */
+const GLABELLA = [[55, 107], [285, 336]];
+
 /** Where to put AU labels (landmark to anchor at, AU ids to show). */
 const LABELS: { at: number; aus: string[] }[] = [
-  { at: 9, aus: ["AU1", "AU2", "AU4"] },
+  { at: 151, aus: ["AU1", "AU2"] },
+  { at: 9, aus: ["AU4"] },
   { at: 346, aus: ["AU5", "AU6", "AU7", "AU43"] },
   { at: 4, aus: ["AU9", "AU10"] },
   { at: 291, aus: ["AU12", "AU14", "AU15", "AU20", "AU23", "AU24"] },
@@ -88,9 +100,37 @@ export class Overlay {
 
     stroke(OVAL, "rgba(255,255,255,0.18)", 1);
     stroke(IRIS, "rgba(255,255,255,0.35)", 1);
+    const forehead = regions.forehead ?? 0;
     for (const { region, conns } of CONTOURS) {
-      const v = regions[region] ?? 0;
+      // The brows move with both the forehead (raise) and the glabella (lower).
+      const v = region === "brows" ? Math.max(forehead, regions.brows ?? 0) : regions[region] ?? 0;
       stroke(conns, heat(v), 1.4 + 2.2 * v);
+    }
+
+    const mix = (a: number, b: number, t: number): [number, number] => [X(a) + (X(b) - X(a)) * t, Y(a) + (Y(b) - Y(a)) * t];
+    const polyline = (pts: [number, number][], color: string, width: number) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width * dpr;
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.stroke();
+    };
+    // Forehead lines: drawn inset from the temples, so they read as wrinkles rather than a grid.
+    const inset = (row: [number, number][]) => row.slice(1, -1);
+    const rows = [
+      FOREHEAD_MID.map((m, i) => mix(BROW_TOP[i], m, 0.5)),
+      FOREHEAD_MID.map((m): [number, number] => [X(m), Y(m)]),
+      FOREHEAD_MID.map((m, i) => mix(m, FOREHEAD_TOP[i], 0.5)),
+    ];
+    for (const row of rows) polyline(inset(row), heat(forehead, 0.8), 1 + 2 * forehead);
+    const glabella = regions.brows ?? 0;
+    if (glabella >= 0.08) {
+      for (const [lower, upper] of GLABELLA) {
+        // Pull each furrow halfway from the brow head towards the midline (8 below, 9 above).
+        const a = mix(lower, 8, 0.5);
+        const b = mix(upper, 9, 0.5);
+        polyline([a, b], heat(glabella), 1.2 + 2.2 * glabella);
+      }
     }
     const cheek = regions.cheeks ?? 0;
     ctx.fillStyle = heat(cheek);

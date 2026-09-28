@@ -44,6 +44,7 @@ export interface Settings {
   overlay: "regions" | "labels" | "off";
   mirror: boolean;
   delegate: "GPU" | "CPU";
+  extended: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { sensitivity: 1, overlay: "regions", mirror: true, delegate: "GPU" };
+export const DEFAULT_SETTINGS: Settings = { sensitivity: 1, overlay: "regions", mirror: true, delegate: "GPU", extended: false };

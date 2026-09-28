@@ -36,11 +36,14 @@ final class GoldenParityTests: XCTestCase {
 
         for (seq, expected) in zip(inputs.sequences, golden.sequences) {
             XCTAssertEqual(seq.name, expected.name)
-            let engine = try EmotionEngine(model: model, platform: seq.platform)
+            let engine = try EmotionEngine(model: model, platform: seq.platform, extended: true)
             var mismatches = 0
             for (i, (frame, want)) in zip(seq.frames, expected.frames).enumerated() {
                 if let cmd = frame.cmd, cmd.hasPrefix("calibrate:") {
                     engine.startCalibration(tMs: frame.t, durationSec: Double(cmd.dropFirst("calibrate:".count))!)
+                }
+                if let cmd = frame.cmd, cmd.hasPrefix("range:") {
+                    engine.startRangeStep(tMs: frame.t, stepId: String(cmd.dropFirst("range:".count)))
                 }
                 let got = engine.process(tMs: frame.t, frame.m)
                 let at = "\(seq.name) frame \(i) t=\(frame.t)"

@@ -1,12 +1,12 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "about": "Facial expression model: FACS Action Units estimated from face-tracking signals, and expression prototypes defined over those AUs. Shared by the web (TypeScript) and iOS (Swift) engines. See docs/RESEARCH.md for the evidence behind every prototype and docs/ARCHITECTURE.md for the scoring maths.",
   "params": {
     "evidence": [0.1, 0.55],
     "floor": 0.02,
     "supportGain": 0.3,
-    "strictness": { "primary": 0.5, "compound": 0.8, "social": 0.5, "cognitive": 0.6, "physical": 0.5 },
-    "adapt": { "lowTauDown": 8, "lowTauUp": 120, "medianTau": 90, "maxDriftUncalibrated": 1, "maxDriftCalibrated": 0.35, "deadzoneInitial": 0.6, "deadzoneLearned": 0.35, "deadzoneLearnSec": 90, "deadzoneCalibrated": 0.2 },
+    "strictness": { "primary": 0.5, "compound": 0.8, "social": 0.5, "cognitive": 0.6, "physical": 0.5, "extended": 0.6 },
+    "adapt": { "lowTauDown": 8, "lowTauUp": 120, "medianTau": 90, "maxDriftUncalibrated": 1, "maxDriftCalibrated": 0.35, "deadzoneInitial": 0.6, "deadzoneLearned": 0.35, "deadzoneLearnSec": 90, "deadzoneCalibrated": 0.12 },
     "asymmetry": { "noise": 0.08, "yawFull": 12, "yawZero": 30 },
     "gaze": { "eyeDegPerUnit": 30 },
     "filter": { "minCutoff": 1.2, "beta": 0.6, "dCutoff": 1 },
@@ -17,18 +17,20 @@
       "complexMax": 3,
       "switchMargin": 0.06,
       "switchHoldMs": 200,
-      "exclusive": [["duchenne_smile", "social_smile"], ["appalled", "hatred"], ["concentration", "confusion"]]
+      "exclusive": [["duchenne_smile", "social_smile"], ["appalled", "hatred"], ["concentration", "confusion"], ["pensive", "boredom"]]
     },
     "micro": { "on": 0.5, "off": 0.3, "minPeak": 0.55, "minMs": 65, "maxMs": 500, "quietMs": 300, "exclude": ["contempt"] },
     "blink": { "on": 0.6, "off": 0.3, "minMs": 50, "maxMs": 500 },
     "perclos": { "windowSec": 60, "closed": 0.8, "maxSqueeze": 0.3 },
     "yawn": { "open": 0.5, "startSec": 0.8, "fullSec": 1.8, "holdSec": 2 },
-    "stillness": { "tau": 0.5, "degPerSec": 15 }
+    "stillness": { "tau": 0.5, "degPerSec": 15 },
+    "blinkRate": { "lo": 22, "hi": 40 },
+    "range": { "settleSec": 0.9, "holdSec": 1.6, "minFraction": 0.25, "gainMin": 0.7, "gainMax": 2.5 }
   },
-  "regions": { "brows": "Brows & forehead", "eyes": "Eyes & lids", "nose": "Nose", "cheeks": "Cheeks", "mouth": "Mouth & lips", "chin": "Chin", "jaw": "Jaw", "head": "Head", "gaze": "Gaze" },
+  "regions": { "forehead": "Forehead", "brows": "Brows & glabella", "eyes": "Eyes & lids", "nose": "Nose", "cheeks": "Cheeks", "mouth": "Mouth & lips", "chin": "Chin", "jaw": "Jaw", "head": "Head", "gaze": "Gaze" },
   "aus": {
-    "AU1": { "name": "Inner brow raiser", "muscles": "Frontalis, pars medialis", "region": "brows", "bilateral": true, "look": "Inner ends of the brows pulled up; brows become oblique; wrinkles in the centre of the forehead." },
-    "AU2": { "name": "Outer brow raiser", "muscles": "Frontalis, pars lateralis", "region": "brows", "bilateral": true, "look": "Outer part of the brows lifted into an arch; wrinkles over the outer forehead." },
+    "AU1": { "name": "Inner brow raiser", "muscles": "Frontalis, pars medialis", "region": "forehead", "bilateral": true, "look": "Inner ends of the brows pulled up; brows become oblique; wrinkles in the centre of the forehead." },
+    "AU2": { "name": "Outer brow raiser", "muscles": "Frontalis, pars lateralis", "region": "forehead", "bilateral": true, "look": "Outer part of the brows lifted into an arch; wrinkles over the outer forehead." },
     "AU4": { "name": "Brow lowerer", "muscles": "Corrugator supercilii, depressor supercilii, procerus", "region": "brows", "bilateral": true, "look": "Brows lowered and pulled together; vertical furrows between the brows." },
     "AU5": { "name": "Upper lid raiser", "muscles": "Levator palpebrae superioris", "region": "eyes", "bilateral": true, "look": "Eye opening widened; white of the eye shows above the iris." },
     "AU6": { "name": "Cheek raiser", "muscles": "Orbicularis oculi, pars orbitalis", "region": "cheeks", "bilateral": true, "look": "Cheeks lifted, skin gathered around the eye, crow's-feet and a bulge under the lower lid. The 'Duchenne' marker." },
@@ -68,7 +70,8 @@
   "temporal": {
     "PERCLOS": { "name": "Eyelid closure over time (PERCLOS)", "look": "Share of the last minute with the eyes at least 80% closed." },
     "YAWN": { "name": "Yawn", "look": "Mouth held wide open for over a second." },
-    "STILL": { "name": "Head stillness", "look": "How still the head has been over the last half second." }
+    "STILL": { "name": "Head stillness", "look": "How still the head has been over the last half second." },
+    "BLINKS": { "name": "Blink rate", "look": "Blinks per minute above the usual 15–20 (maps 22→40 per minute onto 0→1)." }
   },
   "platforms": {
     "mediapipe": {
@@ -119,8 +122,8 @@
         "gaze.pitch": { "rest": 0, "scale": 20, "spread": 10, "mode": "median" }
       },
       "recipes": {
-        "AU1": [{ "m": "browInnerUp", "r": 0.55, "w": 0.6 }, { "m": "geo.browInnerHeight{S}", "r": 0.11, "w": 0.4 }],
-        "AU2": [{ "m": "browOuterUp{S}", "r": 0.55, "w": 0.6 }, { "m": "geo.browOuterHeight{S}", "r": 0.09, "w": 0.4 }],
+        "AU1": [{ "m": "browInnerUp", "r": 0.55, "w": 0.7 }, { "m": "geo.browInnerHeight{S}", "r": 0.11, "w": 0.3 }],
+        "AU2": [{ "m": "browOuterUp{S}", "r": 0.55, "w": 0.7 }, { "m": "geo.browOuterHeight{S}", "r": 0.09, "w": 0.3 }],
         "AU4": [{ "m": "browDown{S}", "r": 0.4, "w": 0.5 }, { "m": "geo.browMidHeight{S}", "r": -0.08, "w": 0.25 }, { "m": "geo.browGap", "r": -0.045, "w": 0.25 }],
         "AU5": [{ "m": "eyeWide{S}", "r": 0.07, "w": 0.6 }, { "m": "geo.eyeOpen{S}", "r": 0.14, "w": 0.4 }],
         "AU6": [{ "m": "geo.cheekHeight{S}", "r": 0.075, "w": 0.6 }, { "m": "geo.lowerLidHeight{S}", "r": 0.026, "w": 0.4 }],
@@ -133,7 +136,7 @@
         "AU16": [{ "m": "mouthLowerDown{S}", "r": 0.6, "w": 1 }, { "m": "jawOpen", "r": 0.45, "w": -0.6 }],
         "AU17": [{ "m": "mouthShrugLower", "r": 0.14, "w": 0.7 }, { "m": "mouthShrugUpper", "r": 0.08, "w": 0.3 }],
         "AU18": [{ "m": "mouthPucker", "r": 0.45, "w": 0.7 }, { "m": "geo.lipCornerOutLeft", "r": -0.07, "w": 0.15 }, { "m": "geo.lipCornerOutRight", "r": -0.07, "w": 0.15 }],
-        "AU20": [{ "m": "mouthStretch{S}", "r": 0.3, "w": 0.6 }, { "m": "geo.lipCornerOut{S}", "r": 0.12, "w": 0.4 }, { "m": "mouthSmile{S}", "r": 0.7, "w": -0.5 }],
+        "AU20": [{ "m": "mouthStretch{S}", "r": 0.3, "w": 0.6 }, { "m": "geo.lipCornerOut{S}", "r": 0.12, "w": 0.4 }, { "m": "mouthSmile{S}", "r": 0.7, "w": -0.3 }],
         "AU22": [{ "m": "mouthFunnel", "r": 0.03, "w": 1 }],
         "AU23": [{ "m": "geo.lipThickness", "r": -0.09, "w": 0.5 }, { "m": "mouthPressLeft", "r": 0.2, "w": 0.125 }, { "m": "mouthPressRight", "r": 0.2, "w": 0.125 }, { "m": "mouthRollLower", "r": 0.15, "w": 0.25 }],
         "AU24": [{ "m": "mouthPress{S}", "r": 0.2, "w": 0.6 }, { "m": "geo.lipThickness", "r": -0.09, "w": 0.4 }],
@@ -235,7 +238,7 @@
       }
     }
   },
-  "tiers": { "primary": "Primary emotions", "compound": "Compound emotions", "social": "Social & self-conscious", "cognitive": "Cognitive states", "physical": "Physical states" },
+  "tiers": { "primary": "Primary emotions", "compound": "Compound emotions", "social": "Social & self-conscious", "cognitive": "Cognitive states", "physical": "Physical states", "extended": "Extended catalogue" },
   "expressions": [
     {
       "id": "happiness",
@@ -290,11 +293,28 @@
       "name": "Fear",
       "emoji": "😨",
       "gloss": "Threat, alarm, anticipation of harm.",
-      "cues": "Brows raised and pulled together (wrinkles only in the centre of the forehead); upper lids raised and lower lids tensed; lips stretched back horizontally, mouth often open.",
-      "slots": [{ "any": ["AU1", "AU2"], "w": 0.8 }, { "any": ["AU4"], "w": 0.6 }, { "any": ["AU5"], "w": 1 }, { "any": ["AU20"], "w": 0.8 }, { "any": ["AU25", "AU26", "AU27"], "w": 0.4 }],
-      "support": [{ "any": ["AU1"], "w": 0.5 }, { "any": ["AU15"], "w": 0.2 }],
-      "inhibit": [{ "any": ["AU12"], "w": 0.6 }],
-      "refs": ["ekman-friesen-1975", "ekman-friesen-hager-2002", "du-2014", "smith-2005", "wegrzyn-2017"]
+      "cues": "Brows raised and pulled together (wrinkles only in the centre of the forehead); upper lids raised high, lower lids tensed; lips stretched back horizontally, mouth often open. EMFACS also lists brows raised with very wide eyes (1+2+5), and wide eyes with stretched lips (5+20).",
+      "refs": ["ekman-friesen-1975", "ekman-friesen-hager-2002", "du-2014", "smith-2005", "wegrzyn-2017"],
+      "variants": [
+        {
+          "name": "full fear face (1+2+4+5+20)",
+          "slots": [{ "any": ["AU1", "AU2"], "w": 0.8 }, { "any": ["AU4"], "w": 0.4 }, { "any": ["AU5"], "w": 1 }, { "any": ["AU20"], "w": 0.8 }, { "any": ["AU25", "AU26", "AU27"], "w": 0.4 }],
+          "support": [{ "any": ["AU1"], "w": 0.5 }, { "any": ["AU15"], "w": 0.2 }],
+          "inhibit": [{ "any": ["AU12B"], "w": 0.6 }]
+        },
+        {
+          "name": "raised brows, very wide eyes (1+2+5)",
+          "slots": [{ "any": ["AU1"], "w": 0.8 }, { "any": ["AU2"], "w": 0.5 }, { "any": ["AU5"], "w": 1, "t": [0.3, 0.75] }],
+          "support": [{ "any": ["AU4"], "w": 0.5 }, { "any": ["AU20"], "w": 0.5 }],
+          "inhibit": [{ "any": ["AU12B"], "w": 0.6 }, { "any": ["AU26", "AU27"], "w": 0.5 }]
+        },
+        {
+          "name": "wide eyes, stretched lips (5+20)",
+          "slots": [{ "any": ["AU5"], "w": 1 }, { "any": ["AU20"], "w": 1 }],
+          "support": [{ "any": ["AU1", "AU2"], "w": 0.4 }, { "any": ["AU25", "AU26"], "w": 0.3 }, { "any": ["AU4"], "w": 0.3 }],
+          "inhibit": [{ "any": ["AU12B"], "w": 0.6 }]
+        }
+      ]
     },
     {
       "id": "anger",
@@ -691,7 +711,116 @@
       "support": [{ "any": ["AU43", "AU41"], "w": 0.3 }, { "any": ["AU6"], "w": 0.2 }],
       "inhibit": [],
       "refs": ["provine-1986"]
+    },
+    {
+      "id": "triumph",
+      "tier": "extended",
+      "name": "Triumph",
+      "emoji": "🏆",
+      "gloss": "Victory — the roar of winning.",
+      "cues": "Mouth open wide as if shouting, head tilted back, an aggressive grimace or grin (in the body: arms raised, fists). Seen in spontaneous displays of Olympic winners.",
+      "slots": [{ "any": ["AU25", "AU26", "AU27"], "w": 1 }, { "any": ["AU53"], "w": 0.7 }, { "any": ["AU4", "AU10", "AU20", "AU12"], "w": 0.6 }],
+      "support": [{ "any": ["AU4"], "w": 0.4 }, { "any": ["AU7"], "w": 0.3 }, { "any": ["AU6"], "w": 0.2 }],
+      "inhibit": [{ "any": ["AU1"], "w": 0.4 }, { "any": ["GAZE_DOWN"], "w": 0.5 }, { "any": ["AU54"], "w": 0.5 }],
+      "refs": ["matsumoto-hwang-2012", "cordaro-2018"]
+    },
+    {
+      "id": "frustration",
+      "tier": "extended",
+      "name": "Frustration",
+      "emoji": "😩",
+      "gloss": "Being blocked from a goal; exasperation.",
+      "cues": "Inner and outer brows raised with the lip corners tightened into dimples (AU1+2 with AU14), or lips pressed.",
+      "slots": [{ "any": ["AU1", "AU2"], "w": 0.8 }, { "any": ["AU14", "AU24", "AU23"], "w": 0.8 }],
+      "support": [{ "any": ["AU14"], "w": 0.4 }, { "any": ["AU4"], "w": 0.2 }],
+      "inhibit": [{ "any": ["AU12B"], "w": 0.6 }, { "any": ["AU5"], "w": 0.4 }, { "any": ["AU25", "AU26"], "w": 0.3 }],
+      "refs": ["craig-2008", "grafsgaard-2013"]
+    },
+    {
+      "id": "anxiety",
+      "tier": "extended",
+      "name": "Anxiety",
+      "emoji": "😓",
+      "gloss": "Nervous tension, apprehension.",
+      "cues": "Low-intensity elements of the fear face (brows raised, lips stretched), frequent blinking, lips pressed or sucked in, and polite rather than felt smiles.",
+      "slots": [{ "any": ["AU1", "AU2", "AU20"], "w": 1, "t": [0.08, 0.4] }, { "any": ["BLINKS", "AU24", "AU28"], "w": 0.6 }],
+      "support": [{ "any": ["BLINKS"], "w": 0.6 }, { "any": ["AU20"], "w": 0.4 }, { "any": ["AU24", "AU28"], "w": 0.3 }],
+      "inhibit": [{ "any": ["AU6"], "w": 0.4 }, { "any": ["AU27"], "w": 0.4 }, { "any": ["AU9", "AU10"], "w": 0.3 }],
+      "refs": ["harrigan-oconnell-1996"]
+    },
+    {
+      "id": "pensive",
+      "tier": "extended",
+      "name": "Thinking",
+      "emoji": "🤔",
+      "gloss": "Looking away to think; retrieving or working something out.",
+      "cues": "Gaze averted up or to the side while the head stays still and the face is otherwise calm — people look away when a question takes mental effort.",
+      "slots": [{ "any": ["GAZE_AWAY", "AU63"], "w": 1 }, { "any": ["STILL"], "w": 0.6 }],
+      "support": [{ "any": ["AU4"], "w": 0.3 }, { "any": ["AU24", "AU28"], "w": 0.2 }],
+      "inhibit": [{ "any": ["AU12"], "w": 0.5 }, { "any": ["AU25", "AU26"], "w": 0.3 }, { "any": ["AU5"], "w": 0.3 }, { "any": ["AU43"], "w": 0.5 }],
+      "refs": ["glenberg-1998", "doherty-sneddon-phelps-2005"]
+    },
+    {
+      "id": "disappointment",
+      "tier": "extended",
+      "name": "Disappointment",
+      "emoji": "😔",
+      "gloss": "Let down — a mouth-only sadness, the pout.",
+      "cues": "Lip corners pulled down and the chin pushed up (a pout), without the raised inner brows of full sadness; gaze often lowered.",
+      "slots": [{ "any": ["AU15"], "w": 0.8 }, { "any": ["AU17"], "w": 0.8 }],
+      "support": [{ "any": ["GAZE_DOWN"], "w": 0.3 }, { "any": ["AU54"], "w": 0.2 }, { "any": ["AU4"], "w": 0.2 }],
+      "inhibit": [{ "any": ["AU12B"], "w": 0.7 }, { "any": ["AU1"], "w": 0.4 }, { "any": ["AU25", "AU26"], "w": 0.4 }],
+      "refs": ["ekman-friesen-hager-2002", "ekman-friesen-1975"]
+    },
+    {
+      "id": "sneer",
+      "tier": "extended",
+      "name": "Sneer",
+      "emoji": "😒",
+      "gloss": "Disdain — a one-sided curl of the upper lip.",
+      "cues": "The upper lip raised (and nose wrinkled) on one side only; often with the head tilted back.",
+      "slots": [{ "any": ["AU10U", "AU9U"], "w": 1, "t": [0.15, 0.5] }],
+      "support": [{ "any": ["AU53"], "w": 0.3 }, { "any": ["AU14U"], "w": 0.3 }, { "any": ["AU4"], "w": 0.2 }],
+      "inhibit": [{ "any": ["AU12B"], "w": 0.6 }],
+      "refs": ["ekman-friesen-1975", "rozin-disgust"]
     }
   ],
-  "references": { "darwin-1872": "Darwin, C. (1872). The Expression of the Emotions in Man and Animals. John Murray.", "duchenne-1862": "Duchenne de Boulogne, G.-B. (1862/1990). The Mechanism of Human Facial Expression. Cambridge University Press.", "ekman-friesen-1975": "Ekman, P., & Friesen, W. V. (1975). Unmasking the Face: A Guide to Recognizing Emotions from Facial Clues. Prentice-Hall.", "ekman-friesen-1978": "Ekman, P., & Friesen, W. V. (1978). Facial Action Coding System. Consulting Psychologists Press.", "ekman-friesen-hager-2002": "Ekman, P., Friesen, W. V., & Hager, J. C. (2002). Facial Action Coding System: The Manual (and EMFACS prototypes). Research Nexus.", "ekman-friesen-1986": "Ekman, P., & Friesen, W. V. (1986). A new pan-cultural facial expression of emotion. Motivation and Emotion, 10, 159–168.", "ekman-1979-brows": "Ekman, P. (1979). About brows: Emotional and conversational signals. In M. von Cranach et al. (Eds.), Human Ethology (pp. 169–202). Cambridge University Press.", "ekman-davidson-friesen-1990": "Ekman, P., Davidson, R. J., & Friesen, W. V. (1990). The Duchenne smile: Emotional expression and brain physiology II. Journal of Personality and Social Psychology, 58, 342–353.", "matsumoto-ekman-2004": "Matsumoto, D., & Ekman, P. (2004). The relationship among expressions, labels, and descriptions of contempt. Journal of Personality and Social Psychology, 87, 529–540.", "du-2014": "Du, S., Tao, Y., & Martinez, A. M. (2014). Compound facial expressions of emotion. PNAS, 111(15), E1454–E1462.", "smith-2005": "Smith, M. L., Cottrell, G. W., Gosselin, F., & Schyns, P. G. (2005). Transmitting and decoding facial expressions. Psychological Science, 16, 184–189.", "wegrzyn-2017": "Wegrzyn, M., Vogt, M., Kireclioglu, B., Schneider, J., & Kissler, J. (2017). Mapping the emotional face: How individual face parts contribute to successful emotion recognition. PLoS ONE, 12(5), e0177239.", "rozin-disgust": "Rozin, P., Lowery, L., & Ebert, R. (1994). Varieties of disgust faces and the structure of disgust. Journal of Personality and Social Psychology, 66, 870–881.", "keltner-1995": "Keltner, D. (1995). Signs of appeasement: Evidence for the distinct displays of embarrassment, amusement, and shame. Journal of Personality and Social Psychology, 68, 441–454.", "keltner-buswell-1997": "Keltner, D., & Buswell, B. N. (1997). Embarrassment: Its distinct form and appeasement functions. Psychological Bulletin, 122, 250–270.", "tracy-robins-2004": "Tracy, J. L., & Robins, R. W. (2004). Show your pride: Evidence for a discrete emotion expression. Psychological Science, 15, 194–197.", "tracy-matsumoto-2008": "Tracy, J. L., & Matsumoto, D. (2008). The spontaneous expression of pride and shame: Evidence for biologically innate nonverbal displays. PNAS, 105, 11655–11660.", "cordaro-2018": "Cordaro, D. T., Sun, R., Keltner, D., Kamble, S., Huddar, N., & McNeil, G. (2018). Universals and cultural variations in 22 emotional expressions across five cultures. Emotion, 18(1), 75–93.", "keltner-cordaro-2017": "Keltner, D., & Cordaro, D. T. (2017). Understanding multimodal emotional expressions: Recent advances in basic emotion theory. In J.-M. Fernández-Dols & J. A. Russell (Eds.), The Science of Facial Expression. Oxford University Press.", "rozin-cohen-2003": "Rozin, P., & Cohen, A. B. (2003). High frequency of facial expressions corresponding to confusion, concentration, and worry in an analysis of naturally occurring facial expressions of Americans. Emotion, 3, 68–75.", "dmello-graesser-2010": "D'Mello, S. K., & Graesser, A. C. (2010). Multimodal semi-automated affect detection from conversational cues, gross body language, and facial features. User Modeling and User-Adapted Interaction, 20, 147–187.", "grafsgaard-2011": "Grafsgaard, J. F., Boyer, K. E., & Lester, J. C. (2011). Predicting facial indicators of confusion with hidden Markov models. Affective Computing and Intelligent Interaction (ACII).", "reeve-1993": "Reeve, J. (1993). The face of interest. Motivation and Emotion, 17, 353–375.", "prkachin-1992": "Prkachin, K. M. (1992). The consistency of facial expressions of pain: A comparison across modalities. Pain, 51, 297–306.", "prkachin-solomon-2008": "Prkachin, K. M., & Solomon, P. E. (2008). The structure, reliability and validity of pain expression: Evidence from patients with shoulder pain. Pain, 139, 267–274.", "wierwille-1994": "Wierwille, W. W., Ellsworth, L. A., Wreggit, S. S., Fairbanks, R. J., & Kirn, C. L. (1994). Research on vehicle-based driver status/performance monitoring. NHTSA Report DOT HS 808 247.", "dinges-1998": "Dinges, D. F., Mallis, M. M., Maislin, G., & Powell, J. W. (1998). Evaluation of techniques for ocular measurement as an index of fatigue and the basis for alertness management. NHTSA Report DOT HS 808 762.", "provine-1986": "Provine, R. R. (1986). Yawning as a stereotyped action pattern and releasing stimulus. Ethology, 72, 109–122.", "plutchik-1980": "Plutchik, R. (1980). Emotion: A Psychoevolutionary Synthesis. Harper & Row.", "girard-2021": "Girard, J. M., Cohn, J. F., Yin, L., & Morency, L.-P. (2021). Reconsidering the Duchenne smile: Formalizing and testing hypotheses about eye constriction and positive emotion. Affective Science, 2, 32–47.", "krumhuber-manstead-2009": "Krumhuber, E. G., & Manstead, A. S. R. (2009). Can Duchenne smiles be feigned? New evidence on felt and false smiles. Emotion, 9, 807–820.", "barrett-2019": "Barrett, L. F., Adolphs, R., Marsella, S., Martinez, A. M., & Pollak, S. D. (2019). Emotional expressions reconsidered: Challenges to inferring emotion from human facial movements. Psychological Science in the Public Interest, 20(1), 1–68.", "jack-2012": "Jack, R. E., Garrod, O. G. B., Yu, H., Caldara, R., & Schyns, P. G. (2012). Facial expressions of emotion are not culturally universal. PNAS, 109, 7241–7244.", "yan-2013": "Yan, W.-J., Wu, Q., Liang, J., Chen, Y.-H., & Fu, X. (2013). How fast are the leaked facial expressions: The duration of micro-expressions. Journal of Nonverbal Behavior, 37, 217–230.", "messinger-2012": "Messinger, D. S., Mattson, W. I., Mahoor, M. H., & Cohn, J. F. (2012). The eyes have it: Making positive expressions more positive and negative expressions more negative. Emotion, 12(3), 430–436." }
+  "rangeSteps": [
+    {
+      "id": "brows_up",
+      "prompt": "Raise your eyebrows as high as you can",
+      "targets": [{ "m": "browInnerUp", "dir": 1 }, { "m": "browOuterUp{S}", "dir": 1 }, { "m": "geo.browInnerHeight{S}", "dir": 1 }, { "m": "geo.browMidHeight{S}", "dir": 1 }, { "m": "geo.browOuterHeight{S}", "dir": 1 }]
+    },
+    {
+      "id": "brows_down",
+      "prompt": "Frown hard — pull your eyebrows down and together",
+      "targets": [{ "m": "browDown{S}", "dir": 1 }, { "m": "geo.browMidHeight{S}", "dir": -1 }, { "m": "geo.browInnerHeight{S}", "dir": -1 }, { "m": "geo.browGap", "dir": -1 }]
+    },
+    {
+      "id": "eyes_wide",
+      "prompt": "Open your eyes as wide as you can",
+      "targets": [{ "m": "eyeWide{S}", "dir": 1 }, { "m": "geo.eyeOpen{S}", "dir": 1 }]
+    },
+    {
+      "id": "lips_stretch",
+      "prompt": "Stretch your lips sideways, teeth together — like “eeek”",
+      "targets": [{ "m": "mouthStretch{S}", "dir": 1 }, { "m": "geo.lipCornerOut{S}", "dir": 1 }]
+    },
+    {
+      "id": "smile",
+      "prompt": "Give your biggest smile",
+      "targets": [{ "m": "mouthSmile{S}", "dir": 1 }, { "m": "geo.lipCornerHeight{S}", "dir": 1 }, { "m": "geo.cheekHeight{S}", "dir": 1 }, { "m": "cheekSquint{S}", "dir": 1 }]
+    },
+    {
+      "id": "mouth_down",
+      "prompt": "Pull the corners of your mouth down",
+      "targets": [{ "m": "mouthFrown{S}", "dir": 1 }, { "m": "geo.lipCornerHeight{S}", "dir": -1 }]
+    },
+    {
+      "id": "nose",
+      "prompt": "Wrinkle your nose, as if at a bad smell",
+      "targets": [{ "m": "noseSneer{S}", "dir": 1 }, { "m": "mouthUpperUp{S}", "dir": 1 }, { "m": "geo.alarHeight{S}", "dir": 1 }, { "m": "geo.upperLipGap", "dir": 1 }]
+    }
+  ],
+  "references": { "darwin-1872": "Darwin, C. (1872). The Expression of the Emotions in Man and Animals. John Murray.", "duchenne-1862": "Duchenne de Boulogne, G.-B. (1862/1990). The Mechanism of Human Facial Expression. Cambridge University Press.", "ekman-friesen-1975": "Ekman, P., & Friesen, W. V. (1975). Unmasking the Face: A Guide to Recognizing Emotions from Facial Clues. Prentice-Hall.", "ekman-friesen-1978": "Ekman, P., & Friesen, W. V. (1978). Facial Action Coding System. Consulting Psychologists Press.", "ekman-friesen-hager-2002": "Ekman, P., Friesen, W. V., & Hager, J. C. (2002). Facial Action Coding System: The Manual (and EMFACS prototypes). Research Nexus.", "ekman-friesen-1986": "Ekman, P., & Friesen, W. V. (1986). A new pan-cultural facial expression of emotion. Motivation and Emotion, 10, 159–168.", "ekman-1979-brows": "Ekman, P. (1979). About brows: Emotional and conversational signals. In M. von Cranach et al. (Eds.), Human Ethology (pp. 169–202). Cambridge University Press.", "ekman-davidson-friesen-1990": "Ekman, P., Davidson, R. J., & Friesen, W. V. (1990). The Duchenne smile: Emotional expression and brain physiology II. Journal of Personality and Social Psychology, 58, 342–353.", "matsumoto-ekman-2004": "Matsumoto, D., & Ekman, P. (2004). The relationship among expressions, labels, and descriptions of contempt. Journal of Personality and Social Psychology, 87, 529–540.", "du-2014": "Du, S., Tao, Y., & Martinez, A. M. (2014). Compound facial expressions of emotion. PNAS, 111(15), E1454–E1462.", "smith-2005": "Smith, M. L., Cottrell, G. W., Gosselin, F., & Schyns, P. G. (2005). Transmitting and decoding facial expressions. Psychological Science, 16, 184–189.", "wegrzyn-2017": "Wegrzyn, M., Vogt, M., Kireclioglu, B., Schneider, J., & Kissler, J. (2017). Mapping the emotional face: How individual face parts contribute to successful emotion recognition. PLoS ONE, 12(5), e0177239.", "rozin-disgust": "Rozin, P., Lowery, L., & Ebert, R. (1994). Varieties of disgust faces and the structure of disgust. Journal of Personality and Social Psychology, 66, 870–881.", "keltner-1995": "Keltner, D. (1995). Signs of appeasement: Evidence for the distinct displays of embarrassment, amusement, and shame. Journal of Personality and Social Psychology, 68, 441–454.", "keltner-buswell-1997": "Keltner, D., & Buswell, B. N. (1997). Embarrassment: Its distinct form and appeasement functions. Psychological Bulletin, 122, 250–270.", "tracy-robins-2004": "Tracy, J. L., & Robins, R. W. (2004). Show your pride: Evidence for a discrete emotion expression. Psychological Science, 15, 194–197.", "tracy-matsumoto-2008": "Tracy, J. L., & Matsumoto, D. (2008). The spontaneous expression of pride and shame: Evidence for biologically innate nonverbal displays. PNAS, 105, 11655–11660.", "cordaro-2018": "Cordaro, D. T., Sun, R., Keltner, D., Kamble, S., Huddar, N., & McNeil, G. (2018). Universals and cultural variations in 22 emotional expressions across five cultures. Emotion, 18(1), 75–93.", "keltner-cordaro-2017": "Keltner, D., & Cordaro, D. T. (2017). Understanding multimodal emotional expressions: Recent advances in basic emotion theory. In J.-M. Fernández-Dols & J. A. Russell (Eds.), The Science of Facial Expression. Oxford University Press.", "rozin-cohen-2003": "Rozin, P., & Cohen, A. B. (2003). High frequency of facial expressions corresponding to confusion, concentration, and worry in an analysis of naturally occurring facial expressions of Americans. Emotion, 3, 68–75.", "dmello-graesser-2010": "D'Mello, S. K., & Graesser, A. C. (2010). Multimodal semi-automated affect detection from conversational cues, gross body language, and facial features. User Modeling and User-Adapted Interaction, 20, 147–187.", "grafsgaard-2011": "Grafsgaard, J. F., Boyer, K. E., & Lester, J. C. (2011). Predicting facial indicators of confusion with hidden Markov models. Affective Computing and Intelligent Interaction (ACII).", "reeve-1993": "Reeve, J. (1993). The face of interest. Motivation and Emotion, 17, 353–375.", "prkachin-1992": "Prkachin, K. M. (1992). The consistency of facial expressions of pain: A comparison across modalities. Pain, 51, 297–306.", "prkachin-solomon-2008": "Prkachin, K. M., & Solomon, P. E. (2008). The structure, reliability and validity of pain expression: Evidence from patients with shoulder pain. Pain, 139, 267–274.", "wierwille-1994": "Wierwille, W. W., Ellsworth, L. A., Wreggit, S. S., Fairbanks, R. J., & Kirn, C. L. (1994). Research on vehicle-based driver status/performance monitoring. NHTSA Report DOT HS 808 247.", "dinges-1998": "Dinges, D. F., Mallis, M. M., Maislin, G., & Powell, J. W. (1998). Evaluation of techniques for ocular measurement as an index of fatigue and the basis for alertness management. NHTSA Report DOT HS 808 762.", "provine-1986": "Provine, R. R. (1986). Yawning as a stereotyped action pattern and releasing stimulus. Ethology, 72, 109–122.", "plutchik-1980": "Plutchik, R. (1980). Emotion: A Psychoevolutionary Synthesis. Harper & Row.", "girard-2021": "Girard, J. M., Cohn, J. F., Yin, L., & Morency, L.-P. (2021). Reconsidering the Duchenne smile: Formalizing and testing hypotheses about eye constriction and positive emotion. Affective Science, 2, 32–47.", "krumhuber-manstead-2009": "Krumhuber, E. G., & Manstead, A. S. R. (2009). Can Duchenne smiles be feigned? New evidence on felt and false smiles. Emotion, 9, 807–820.", "barrett-2019": "Barrett, L. F., Adolphs, R., Marsella, S., Martinez, A. M., & Pollak, S. D. (2019). Emotional expressions reconsidered: Challenges to inferring emotion from human facial movements. Psychological Science in the Public Interest, 20(1), 1–68.", "jack-2012": "Jack, R. E., Garrod, O. G. B., Yu, H., Caldara, R., & Schyns, P. G. (2012). Facial expressions of emotion are not culturally universal. PNAS, 109, 7241–7244.", "yan-2013": "Yan, W.-J., Wu, Q., Liang, J., Chen, Y.-H., & Fu, X. (2013). How fast are the leaked facial expressions: The duration of micro-expressions. Journal of Nonverbal Behavior, 37, 217–230.", "messinger-2012": "Messinger, D. S., Mattson, W. I., Mahoor, M. H., & Cohn, J. F. (2012). The eyes have it: Making positive expressions more positive and negative expressions more negative. Emotion, 12(3), 430–436.", "matsumoto-hwang-2012": "Matsumoto, D., & Hwang, H. S. (2012). Evidence for a nonverbal expression of triumph. Evolution and Human Behavior, 33, 520–529.", "craig-2008": "Craig, S. D., D'Mello, S., Witherspoon, A., & Graesser, A. (2008). Emote aloud during learning with AutoTutor: Applying the Facial Action Coding System to cognitive–affective states during learning. Cognition and Emotion, 22(5), 777–788.", "grafsgaard-2013": "Grafsgaard, J. F., Wiggins, J. B., Boyer, K. E., Wiebe, E. N., & Lester, J. C. (2013). Automatically recognizing facial expression: Predicting engagement and frustration. Proceedings of Educational Data Mining 2013.", "harrigan-oconnell-1996": "Harrigan, J. A., & O'Connell, D. M. (1996). How do you look when feeling anxious? Facial displays of anxiety. Personality and Individual Differences, 21, 205–212.", "glenberg-1998": "Glenberg, A. M., Schroeder, J. L., & Robertson, D. A. (1998). Averting the gaze disengages the environment and facilitates remembering. Memory & Cognition, 26, 651–658.", "doherty-sneddon-phelps-2005": "Doherty-Sneddon, G., & Phelps, F. G. (2005). Gaze aversion: A response to cognitive or social difficulty? Memory & Cognition, 33, 727–733." }
 }

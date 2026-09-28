@@ -7,8 +7,9 @@ export type Features = Record<string, number>;
 /**
  * Intensity of one AU channel from raw measurements.
  *
- *   d_i = (x_i - baseline_i) - offset_i - sign(range_i) * deadzone_i
+ *   d_i = (x_i - baseline_i - sign(range_i) * deadzone_i) * gain_i - offset_i
  *   n_i = clamp(d_i / range_i * sensitivity, 0, 1)
+ * where gain_i is the person's range gain for that signal and direction (1 unless range-calibrated).
  *   AU  = clamp(sum_i w_i * n_i, 0, 1)
  *
  * Missing measurements are dropped and the positive weights renormalised, so a
@@ -25,7 +26,8 @@ export function channelValue(
   for (const t of ch.terms) {
     const x = measurements[t.key];
     if (x === undefined || !Number.isFinite(x)) continue;
-    const d = x - baseline.get(t.key) - t.o - Math.sign(t.r) * baseline.deadzone(t.key);
+    const dir = Math.sign(t.r);
+    const d = (x - baseline.get(t.key) - dir * baseline.deadzone(t.key)) * baseline.gain(t.key, dir) - t.o;
     const n = clamp01((d / t.r) * sensitivity);
     sum += t.w * n;
     if (t.w > 0) availablePos += t.w;

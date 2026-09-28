@@ -5,6 +5,11 @@ struct SettingsView: View {
     @Binding var showMesh: Bool
     @Binding var sensitivity: Double
     let recalibrate: () -> Void
+    let calibrateRange: () -> Void
+
+    private var extended: Binding<Bool> {
+        Binding(get: { tracker.extended }, set: { tracker.extended = $0 })
+    }
 
     var body: some View {
         NavigationStack {
@@ -23,10 +28,17 @@ struct SettingsView: View {
                     Text("Higher sensitivity reacts to subtler movements but also to noise.")
                 }
                 Section {
+                    Toggle("Extended emotion catalogue", isOn: extended)
+                } footer: {
+                    Text("Adds triumph, frustration, anxiety, thinking, disappointment and sneer to the non-primary emotions.")
+                }
+                Section {
                     Button("Recalibrate neutral face", action: recalibrate)
+                    Button("Calibrate expression range", action: calibrateRange)
                     Button("Forget calibration", role: .destructive) { tracker.forgetCalibration() }
                 } footer: {
-                    Text(tracker.engine.baseline.calibrated ? "Calibrated to your neutral face." : "Not calibrated — the baseline is being learned automatically.")
+                    Text((tracker.engine.baseline.calibrated ? "Calibrated to your neutral face." : "Not calibrated — the baseline is being learned automatically.")
+                         + (tracker.hasRangeGains ? " Expression range tuned to your face." : ""))
                 }
                 Section("About") {
                     Text("Mien tracks 52 facial blendshapes with the TrueDepth camera (ARKit), converts them to FACS Action Units, and names expressions using prototypes from Ekman & Friesen, EMFACS, Du, Tao & Martinez (compound emotions), Keltner, Tracy & Robins, Rozin & Cohen and Prkachin & Solomon.")

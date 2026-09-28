@@ -29,7 +29,7 @@ final class ModelTests: XCTestCase {
         for (id, face) in prototypes {
             let aus = computeAUs(cm, withGaze(cm, arkitFace(cm, face)), base, 1)
             var f = aus
-            f["PERCLOS"] = 0; f["YAWN"] = 0; f["STILL"] = 1
+            f["PERCLOS"] = 0; f["YAWN"] = 0; f["STILL"] = 1; f["BLINKS"] = 0
             let primaries = cm.expressions.filter { $0.tier == "primary" }
             let best = primaries.max { scoreExpression(cm, $0, f) < scoreExpression(cm, $1, f) }!
             XCTAssertEqual(best.id, id)

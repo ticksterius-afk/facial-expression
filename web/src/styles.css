@@ -88,6 +88,7 @@ button { cursor: pointer; }
 .chips .c.tier-social { background: rgba(62,207,142,.14); border-color: rgba(62,207,142,.35); }
 .chips .c.tier-cognitive { background: rgba(245,185,66,.14); border-color: rgba(245,185,66,.35); }
 .chips .c.tier-physical { background: rgba(255,107,107,.14); border-color: rgba(255,107,107,.35); }
+.chips .c.tier-extended { background: rgba(214,122,255,.14); border-color: rgba(214,122,255,.4); }
 .noface {
   position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%);
   padding: 10px 16px; border-radius: 999px; background: rgba(0,0,0,.6); color: var(--text-2); font-size: 14px;

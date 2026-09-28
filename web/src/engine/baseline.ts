@@ -1,4 +1,4 @@
-import type { CompiledModel, CompiledMeasurement } from "./model.ts";
+import type { CompiledModel, CompiledMeasurement, CompiledRangeStep } from "./model.ts";
 
 /**
  * Per-person neutral baseline for every measurement.
@@ -19,19 +19,33 @@ import type { CompiledModel, CompiledMeasurement } from "./model.ts";
  * dead-zone is a fraction of each signal's between-person neutral spread
  * (measured on real faces): wide on first sight of a new face, narrowing as
  * the adaptive baseline learns the person, and small once calibrated.
+ *
+ * People also differ in how *far* their face moves, and face trackers
+ * under-report some movements (MediaPipe's brows especially). An optional
+ * range calibration asks for a few maximal expressions ("raise your brows as
+ * high as you can") and stores a per-signal, per-direction gain so that each
+ * person's own maximum maps to a strong action.
  */
 export interface BaselineView {
   get(key: string): number;
   deadzone(key: string): number;
+  /** Personal range gain for a measurement moving in direction `dir` (+1/-1). */
+  gain(key: string, dir: number): number;
 }
+
+export type RangeStepResult = { progress: number } | { result: "done"; updated: string[]; weak: string[] } | { result: "failed" };
+
+const gainKey = (key: string, dir: number) => `${key}|${dir < 0 ? "-" : "+"}`;
 
 export class BaselineTracker implements BaselineView {
   private readonly values = new Map<string, number>();
   private readonly anchors = new Map<string, number>();
+  private readonly gains = new Map<string, number>();
   private readonly specs: Map<string, CompiledMeasurement>;
   private calibratedFlag = false;
   private faceTime = 0;
   private calib: { start: number; duration: number; samples: Map<string, number[]>; frames: number; faceFrames: number } | null = null;
+  private rangeRun: { step: CompiledRangeStep; start: number; samples: Map<string, number[]>; frames: number; faceFrames: number } | null = null;
 
   private readonly cm: CompiledModel;
 
@@ -71,6 +85,15 @@ export class BaselineTracker implements BaselineView {
 
   deadzone(key: string): number {
     return (this.specs.get(key)?.spread ?? 0) * this.deadzoneFactor;
+  }
+
+  gain(key: string, dir: number): number {
+    return this.gains.get(gainKey(key, dir)) ?? 1;
+  }
+
+  /** True while a neutral or range calibration is collecting (baselines are frozen). */
+  get busy(): boolean {
+    return this.calib !== null || this.rangeRun !== null;
   }
 
   /** Adapt towards the current measurements. dt in seconds. */
@@ -156,6 +179,87 @@ export class BaselineTracker implements BaselineView {
     return Object.fromEntries(this.anchors);
   }
 
+  // ---------------------------------------------------------------- range calibration
+
+  /** Begin one guided maximal-expression step (see model.rangeSteps). t in seconds. */
+  startRangeStep(t: number, stepId: string): void {
+    const step = this.cm.rangeSteps.find((s) => s.id === stepId);
+    if (!step) throw new Error(`Unknown range step ${stepId}`);
+    this.rangeRun = { step, start: t, samples: new Map(), frames: 0, faceFrames: 0 };
+  }
+
+  cancelRangeStep(): void {
+    this.rangeRun = null;
+  }
+
+  get rangeStepId(): string | null {
+    return this.rangeRun?.step.id ?? null;
+  }
+
+  /**
+   * Feeds a frame to the active range step. Samples are taken after a settle
+   * period; at the end each target's 90th-percentile deviation from neutral
+   * sets gain = scale / deviation (clamped). Targets that barely moved are
+   * reported as "weak" and keep their previous gain.
+   */
+  rangeStep(t: number, measurements: Record<string, number> | null): RangeStepResult | null {
+    const r = this.rangeRun;
+    if (!r) return null;
+    const p = this.cm.params.range;
+    const elapsed = t - r.start;
+    r.frames++;
+    if (measurements) {
+      r.faceFrames++;
+      if (elapsed >= p.settleSec) {
+        for (const target of r.step.targets) {
+          const x = measurements[target.key];
+          if (x === undefined || !Number.isFinite(x)) continue;
+          const k = gainKey(target.key, target.dir);
+          let arr = r.samples.get(k);
+          if (!arr) r.samples.set(k, (arr = []));
+          arr.push(target.dir * (x - this.get(target.key)));
+        }
+      }
+    }
+    const total = p.settleSec + p.holdSec;
+    if (elapsed < total) return { progress: Math.max(0, elapsed / total) };
+    this.rangeRun = null;
+    if (r.faceFrames < Math.max(5, 0.6 * r.frames)) return { result: "failed" };
+    const updated: string[] = [];
+    const weak: string[] = [];
+    for (const target of r.step.targets) {
+      const k = gainKey(target.key, target.dir);
+      const arr = r.samples.get(k);
+      if (!arr || arr.length < 5) continue;
+      const peak = quantile(arr, 0.9);
+      if (peak >= p.minFraction * target.scale) {
+        this.gains.set(k, Math.min(p.gainMax, Math.max(p.gainMin, target.scale / peak)));
+        updated.push(k);
+      } else {
+        weak.push(k);
+      }
+    }
+    return { result: "done", updated, weak };
+  }
+
+  /** Personal range gains, for persistence. */
+  getGains(): Record<string, number> {
+    return Object.fromEntries(this.gains);
+  }
+
+  setGains(gains: Record<string, number>): void {
+    const p = this.cm.params.range;
+    for (const [k, v] of Object.entries(gains)) {
+      const key = k.slice(0, k.lastIndexOf("|"));
+      if (!this.specs.has(key) || !Number.isFinite(v)) continue;
+      this.gains.set(k, Math.min(p.gainMax, Math.max(p.gainMin, v)));
+    }
+  }
+
+  resetGains(): void {
+    this.gains.clear();
+  }
+
   snapshot(): Record<string, number> {
     return Object.fromEntries(this.values);
   }
@@ -180,6 +284,16 @@ export class DefaultBaseline implements BaselineView {
   deadzone(key: string): number {
     return (this.spread.get(key) ?? 0) * this.factor;
   }
+
+  gain(): number {
+    return 1;
+  }
+}
+
+/** Nearest-rank quantile (q in [0,1]). */
+export function quantile(a: number[], q: number): number {
+  const s = [...a].sort((x, y) => x - y);
+  return s[Math.min(s.length - 1, Math.floor(q * s.length))];
 }
 
 export function median(a: number[]): number {

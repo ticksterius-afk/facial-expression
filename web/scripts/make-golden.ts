@@ -40,10 +40,12 @@ export function goldenFrame(r: FrameResult, auIds: string[], withAUs: boolean) {
 }
 
 export function runSequence(seq: Sequence) {
-  const engine = new EmotionEngine(model, seq.platform);
-  const auIds = [...engine.cm.auIds, "PERCLOS", "YAWN", "STILL"];
+  // Extended catalogue on, so its expressions are covered by the parity check too.
+  const engine = new EmotionEngine(model, seq.platform, { extended: true });
+  const auIds = [...engine.cm.auIds, "PERCLOS", "YAWN", "STILL", "BLINKS"];
   return seq.frames.map((f, i) => {
     if (f.cmd?.startsWith("calibrate:")) engine.startCalibration(f.t, Number(f.cmd.split(":")[1]));
+    if (f.cmd?.startsWith("range:")) engine.startRangeStep(f.t, f.cmd.split(":")[1]);
     return goldenFrame(engine.process(f.t, f.m), auIds, i % 5 === 0);
   });
 }

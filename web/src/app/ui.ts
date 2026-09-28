@@ -23,8 +23,8 @@ export const PRIMARY_COLORS: Record<string, string> = {
 };
 
 const NEUTRAL = { id: "neutral", name: "Neutral", emoji: "😐", gloss: "No expression stands out from your baseline.", tier: "primary" as Tier };
-const TIER_ORDER: Tier[] = ["primary", "compound", "social", "cognitive", "physical"];
-const REGION_ORDER = ["brows", "eyes", "cheeks", "nose", "mouth", "chin", "jaw", "head", "gaze"];
+const TIER_ORDER: Tier[] = ["primary", "compound", "social", "cognitive", "physical", "extended"];
+const REGION_ORDER = ["forehead", "brows", "eyes", "cheeks", "nose", "mouth", "chin", "jaw", "head", "gaze"];
 
 interface Row {
   root: HTMLElement;
@@ -90,10 +90,17 @@ export class UI {
     if (name === "why") this.lastWhyRender = 0;
   }
 
+  /** Shows or hides the extended catalogue group (the engine option is set by the caller). */
+  setExtended(on: boolean): void {
+    for (const node of document.querySelectorAll<HTMLElement>("#tab-emotions [data-tier='extended']")) node.hidden = !on;
+  }
+
   private buildEmotions(): void {
     const host = $("#tab-emotions");
     for (const tier of TIER_ORDER) {
-      host.append(el("div", "group-title", this.model.tiers[tier]));
+      const title = el("div", "group-title", this.model.tiers[tier]);
+      title.dataset.tier = tier;
+      host.append(title);
       const ids = [...(tier === "primary" ? ["neutral"] : []), ...this.engine.cm.expressions.filter((e) => e.tier === tier).map((e) => e.id)];
       for (const id of ids) {
         const meta = this.exprMeta(id);
@@ -112,10 +119,12 @@ export class UI {
           this.selectTab("why");
           this.onSelectExpression?.(id);
         });
+        root.dataset.tier = tier;
         host.append(root);
         this.exprRows.set(id, { root, bar, value });
       }
     }
+    this.setExtended(this.engine.extended);
   }
 
   private buildFace(): void {

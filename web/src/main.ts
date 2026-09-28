@@ -10,13 +10,14 @@ import type { Landmark } from "./platform/mediapipe/geometry.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const CALIBRATION_KEY = "calibration.mediapipe";
+const GAINS_KEY = "gains.mediapipe";
 const UI_INTERVAL_MS = 80;
 
 const video = $<HTMLVideoElement>("#video");
 const stage = $("#stage");
 const overlay = new Overlay($<HTMLCanvasElement>("#overlay"));
 const settings: Settings = load("settings", DEFAULT_SETTINGS);
-const engine = new EmotionEngine(MODEL, "mediapipe", { sensitivity: settings.sensitivity });
+const engine = new EmotionEngine(MODEL, "mediapipe", { sensitivity: settings.sensitivity, extended: settings.extended });
 const ui = new UI(engine);
 
 let tracker: Tracker | null = null;
@@ -34,6 +35,8 @@ let wakeLock: { release(): Promise<void> } | null = null;
 // Restore a previous calibration for this device.
 const saved = loadRaw<Record<string, number>>(CALIBRATION_KEY);
 if (saved) engine.baseline.setCalibration(saved);
+const savedGains = loadRaw<Record<string, number>>(GAINS_KEY);
+if (savedGains) engine.baseline.setGains(savedGains);
 
 // ------------------------------------------------------------------ start
 $("#btn-start").addEventListener("click", () => start("camera"));
@@ -90,6 +93,7 @@ function frame(): void {
     overlay.draw(video, lastLandmarks, out.regions, out.aus, settings.overlay, isMirrored());
     if (out.events.length) ui.addEvents(out.events);
     handleCalibration(out);
+    handleRange(out);
     if (t - lastUi > UI_INTERVAL_MS) {
       lastUi = t;
       ui.update(out, fps);
@@ -113,9 +117,15 @@ $("#btn-recalibrate").addEventListener("click", () => {
 });
 $("#btn-forget").addEventListener("click", () => {
   engine.baseline.reset();
+  engine.baseline.resetGains();
   remove(CALIBRATION_KEY);
+  remove(GAINS_KEY);
   toast("Calibration forgotten — the baseline will be learned from scratch.");
   setStatus();
+});
+$("#btn-range").addEventListener("click", () => {
+  dialog.close();
+  if (running) showRangeIntro();
 });
 
 let calibrating = false;
@@ -145,10 +155,76 @@ function handleCalibration(out: FrameResult): void {
     const cal = engine.baseline.getCalibration();
     if (cal) save(CALIBRATION_KEY, cal);
     toast("Calibrated to your neutral face.");
+    if (!Object.keys(engine.baseline.getGains()).length) showRangeIntro();
   } else {
     toast("Couldn't see your face clearly — try again with your face in view.");
   }
   setStatus();
+}
+
+// ------------------------------------------------------------------ range calibration
+// A few maximal expressions teach the engine how far this person's face moves.
+const rangeSteps = engine.cm.rangeSteps.filter((s) => s.targets.length > 0);
+let rangeIndex = -1;
+let rangeUpdated = 0;
+let rangeWeak: string[] = [];
+
+$("#btn-range-go").addEventListener("click", () => {
+  rangeIndex = 0;
+  rangeUpdated = 0;
+  rangeWeak = [];
+  $("#btn-range-go").hidden = true;
+  $("#btn-range-skip").textContent = "Stop";
+  startRangeStep();
+});
+$("#btn-range-skip").addEventListener("click", () => finishRange(rangeIndex >= 0));
+
+function showRangeIntro(): void {
+  rangeIndex = -1;
+  $("#range-title").textContent = "Calibrate your range";
+  $("#range-count").textContent = `${rangeSteps.length} faces · about ${Math.round(rangeSteps.length * (MODEL.params.range.settleSec + MODEL.params.range.holdSec))} seconds`;
+  $("#range-text").textContent = "Faces move by different amounts, and trackers under-report some movements — especially the brows. Make each face as strongly as you can so your full movement counts as full intensity.";
+  $("#btn-range-go").hidden = false;
+  $("#btn-range-skip").textContent = "Not now";
+  $("#range").hidden = false;
+}
+
+function startRangeStep(): void {
+  const step = rangeSteps[rangeIndex];
+  $("#range-count").textContent = `Face ${rangeIndex + 1} of ${rangeSteps.length}`;
+  $("#range-title").textContent = step.prompt;
+  $("#range-text").textContent = "Hold it until the ring is full.";
+  engine.startRangeStep(performance.now(), step.id);
+}
+
+function handleRange(out: FrameResult): void {
+  if (rangeIndex < 0 || !out.range.step) return;
+  const arc = document.getElementById("range-arc");
+  if (arc) arc.style.strokeDashoffset = String(276.46 * (1 - out.range.progress));
+  if (!out.range.result) return;
+  if (out.range.result === "done") {
+    rangeUpdated += out.range.updated?.length ?? 0;
+    if (out.range.weak?.length) rangeWeak.push(rangeSteps[rangeIndex].prompt);
+  }
+  rangeIndex++;
+  if (rangeIndex < rangeSteps.length) startRangeStep();
+  else finishRange(true);
+}
+
+function finishRange(completed: boolean): void {
+  engine.baseline.cancelRangeStep();
+  $("#range").hidden = true;
+  const arc = document.getElementById("range-arc");
+  if (arc) arc.style.strokeDashoffset = "276.46";
+  const wasRunning = rangeIndex >= 0;
+  rangeIndex = -1;
+  if (!wasRunning) return;
+  save(GAINS_KEY, engine.baseline.getGains());
+  if (completed) {
+    toast(rangeWeak.length
+      ? `Range calibrated (${rangeUpdated} signals). Little movement seen for: ${rangeWeak.join("; ")}.`
+      : `Range calibrated — ${rangeUpdated} signals tuned to your face.`);
+  }
 }
 
 function setStatus(): void {
@@ -183,6 +259,7 @@ const sensOut = $("#sens-out");
 const overlayMode = $<HTMLSelectElement>("#overlay-mode");
 const mirror = $<HTMLInputElement>("#mirror");
 const delegate = $<HTMLSelectElement>("#delegate");
+const extendedBox = $<HTMLInputElement>("#extended");
 
 $("#btn-settings").addEventListener("click", () => {
   sens.value = String(settings.sensitivity);
@@ -190,7 +267,14 @@ $("#btn-settings").addEventListener("click", () => {
   overlayMode.value = settings.overlay;
   mirror.checked = settings.mirror;
   delegate.value = settings.delegate;
+  extendedBox.checked = settings.extended;
   dialog.showModal();
+});
+extendedBox.addEventListener("change", () => {
+  settings.extended = extendedBox.checked;
+  engine.extended = settings.extended;
+  ui.setExtended(settings.extended);
+  save("settings", settings);
 });
 sens.addEventListener("input", () => {
   settings.sensitivity = Number(sens.value);

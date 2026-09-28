@@ -23,7 +23,7 @@ struct PanelView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     switch tab {
-                    case .emotions: EmotionsList(output: tracker.output, cm: tracker.engine.cm) { id in whyID = id; tab = .why }
+                    case .emotions: EmotionsList(output: tracker.output, cm: tracker.engine.cm, extended: tracker.extended) { id in whyID = id; tab = .why }
                     case .face: FaceList(output: tracker.output, cm: tracker.engine.cm, fps: tracker.fps)
                     case .why: WhyView(output: tracker.output, engine: tracker.engine, selected: $whyID)
                     case .log: LogView(events: tracker.events, timeline: tracker.timeline)
@@ -53,9 +53,12 @@ private struct GroupTitle: View {
 private struct EmotionsList: View {
     let output: FrameResult?
     let cm: CompiledModel
+    let extended: Bool
     let select: (String) -> Void
 
-    private let tiers = ["primary", "compound", "social", "cognitive", "physical"]
+    private var tiers: [String] {
+        ["primary", "compound", "social", "cognitive", "physical"] + (extended ? ["extended"] : [])
+    }
 
     var body: some View {
         ForEach(tiers, id: \.self) { tier in
@@ -97,7 +100,7 @@ private struct FaceList: View {
     let cm: CompiledModel
     let fps: Double
 
-    private let regionOrder = ["brows", "eyes", "cheeks", "nose", "mouth", "chin", "jaw", "head", "gaze"]
+    private let regionOrder = ["forehead", "brows", "eyes", "cheeks", "nose", "mouth", "chin", "jaw", "head", "gaze"]
 
     var body: some View {
         let o = output

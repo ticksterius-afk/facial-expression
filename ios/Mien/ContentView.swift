@@ -7,6 +7,7 @@ struct ContentView: View {
     @AppStorage("sensitivity") private var sensitivity = 1.0
     @State private var showSettings = false
     @State private var showCalibration = false
+    @State private var calibrateRangeOnly = false
     @State private var tab: PanelTab = .emotions
     @State private var whyID: String?
 
@@ -44,6 +45,18 @@ struct ContentView: View {
                             .padding(.horizontal, 16).padding(.vertical, 10)
                             .background(.black.opacity(0.6), in: Capsule())
                     }
+                    if let summary = tracker.rangeSummary {
+                        Text(summary)
+                            .font(.callout)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 16).padding(.vertical, 10)
+                            .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 12))
+                            .padding()
+                            .task(id: summary) {
+                                try? await Task.sleep(for: .seconds(5))
+                                tracker.rangeSummary = nil
+                            }
+                    }
                 }
                 .frame(height: geo.size.height * 0.58)
                 .clipped()
@@ -55,13 +68,18 @@ struct ContentView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView(showMesh: $showMesh, sensitivity: $sensitivity, recalibrate: {
                 showSettings = false
+                calibrateRangeOnly = false
+                showCalibration = true
+            }, calibrateRange: {
+                showSettings = false
+                calibrateRangeOnly = true
                 showCalibration = true
             })
             .presentationDetents([.medium, .large])
         }
         .overlay {
             if showCalibration {
-                CalibrationView(isPresented: $showCalibration)
+                CalibrationView(isPresented: $showCalibration, startWithRange: calibrateRangeOnly)
             }
         }
         .onAppear {
@@ -76,6 +94,7 @@ struct ContentView: View {
         HStack(spacing: 10) {
             Text("Mien").font(.headline.weight(.bold))
             Button {
+                calibrateRangeOnly = false
                 showCalibration = true
             } label: {
                 HStack(spacing: 6) {

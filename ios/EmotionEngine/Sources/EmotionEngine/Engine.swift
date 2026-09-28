@@ -33,6 +33,9 @@ public struct FrameResult: Sendable {
     public let calibrationActive: Bool
     public let calibrationProgress: Double
     public let calibrationResult: BaselineTracker.CalibrationStep?
+    /// Active personal-range step id and its progress / completion.
+    public let rangeStepId: String?
+    public let range: BaselineTracker.RangeStep?
 }
 
 /// Real-time facial expression engine — a line-for-line port of
@@ -41,8 +44,12 @@ public final class EmotionEngine {
     public let cm: CompiledModel
     public let baseline: BaselineTracker
     public var sensitivity: Double
+    /// Whether the extended catalogue (tier "extended") is scored and listed.
+    public var extended: Bool
 
     private var filters: [String: OneEuroFilter] = [:]
+    private var rangeStepId: String?
+    private var rangeState: BaselineTracker.RangeStep?
     private let temporal: TemporalFeatures
     private let micro: MicroExpressionDetector
     private let primaryIds: [String]
@@ -52,10 +59,11 @@ public final class EmotionEngine {
     private var candidate: (id: String, since: Double)?
     private var lastFeatures: Features = [:]
 
-    public init(model: EmotionModel, platform: String, sensitivity: Double = 1) throws {
+    public init(model: EmotionModel, platform: String, sensitivity: Double = 1, extended: Bool = false) throws {
         cm = try CompiledModel(model: model, platform: platform)
         baseline = BaselineTracker(cm)
         self.sensitivity = sensitivity
+        self.extended = extended
         let f = cm.params.filter
         for ch in cm.channels { filters[ch.id] = OneEuroFilter(minCutoff: f.minCutoff, beta: f.beta, dCutoff: f.dCutoff) }
         temporal = TemporalFeatures(cm.params)
@@ -66,6 +74,11 @@ public final class EmotionEngine {
 
     public func startCalibration(tMs: Double, durationSec: Double = 3) {
         baseline.startCalibration(t: tMs / 1000, duration: durationSec)
+    }
+
+    /// Begin one guided maximal-expression step of the personal range calibration.
+    public func startRangeStep(tMs: Double, stepId: String) {
+        baseline.startRangeStep(t: tMs / 1000, stepId: stepId)
     }
 
     /// Process one frame; `input` is nil when no face is visible.
@@ -84,6 +97,8 @@ public final class EmotionEngine {
         case .done, .failed: progress = 1; result = cal
         case nil: progress = 0
         }
+        rangeStepId = baseline.rangeStepId
+        rangeState = baseline.rangeStep(t: t, measurements)
 
         guard let measurements else {
             for flt in filters.values { flt.reset() }
@@ -95,7 +110,7 @@ public final class EmotionEngine {
             return makeResult(tMs, face: false, lastFeatures, [], progress, result, (pitch: 0, yaw: 0, roll: 0))
         }
 
-        if !baseline.calibrating { baseline.update(measurements, dt: dt) }
+        if !baseline.busy { baseline.update(measurements, dt: dt) }
         let base = { (k: String) in self.baseline.value(k) }
 
         // 1. Raw AU channels -> smoothed channels.
@@ -111,8 +126,9 @@ public final class EmotionEngine {
         let squeeze = max(raw["AU6"] ?? 0, raw["AU4"] ?? 0)
         var events = temporal.update(t: t, dt: dt, eyesClosed: raw["AU43"] ?? 0, squeeze: squeeze, mouthStretch: raw["AU27"] ?? 0,
                                      pose: (measurements["pose.pitch"] ?? 0, measurements["pose.yaw"] ?? 0, measurements["pose.roll"] ?? 0))
-        for key in ["PERCLOS", "YAWN", "STILL"] {
-            let v = key == "PERCLOS" ? temporal.perclos : key == "YAWN" ? temporal.yawn : temporal.still
+        let blinks = smoothstep(p.blinkRate.lo, p.blinkRate.hi, Double(temporal.blinkRate))
+        let temporalValues: [(String, Double)] = [("PERCLOS", temporal.perclos), ("YAWN", temporal.yawn), ("STILL", temporal.still), ("BLINKS", blinks)]
+        for (key, v) in temporalValues {
             raw[key] = v
             smooth[key] = v
         }
@@ -121,6 +137,10 @@ public final class EmotionEngine {
         let a = dt > 0 ? emaAlpha(dt, p.scoreTau) : 1
         var rawPrimary: [(String, Double)] = []
         for e in cm.expressions {
+            if e.tier == "extended" && !extended {
+                scores[e.id] = 0
+                continue
+            }
             let s = scoreExpression(cm, e, smooth)
             scores[e.id]! += (s - scores[e.id]!) * a
             if e.tier == "primary" && !p.micro.exclude.contains(e.id) {
@@ -180,7 +200,8 @@ public final class EmotionEngine {
             complex: face ? complex : [], regions: regions, pspi: face ? EmotionEngine.pspiOf(f) : 0,
             pose: pose, blinkRate: temporal.blinkRate, perclos: temporal.perclos, events: events,
             calibrated: baseline.calibrated, calibrationActive: baseline.calibrating,
-            calibrationProgress: progress, calibrationResult: calResult)
+            calibrationProgress: progress, calibrationResult: calResult,
+            rangeStepId: rangeState == nil ? nil : rangeStepId, range: rangeState)
     }
 
     private static func pspiOf(_ f: Features) -> Double { pspi(f) }

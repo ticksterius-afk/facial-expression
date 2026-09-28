@@ -11,7 +11,8 @@ func channelValue(_ ch: CompiledChannel, _ m: [String: Double], _ baseline: Base
     var availablePos = 0.0
     for t in ch.terms {
         guard let x = m[t.key], x.isFinite else { continue }
-        let d = x - baseline.value(t.key) - t.o - sign(t.r) * baseline.deadzone(t.key)
+        let dir = sign(t.r)
+        let d = (x - baseline.value(t.key) - dir * baseline.deadzone(t.key)) * baseline.gain(t.key, dir) - t.o
         let n = clamp01((d / t.r) * sensitivity)
         sum += t.w * n
         if t.w > 0 { availablePos += t.w }

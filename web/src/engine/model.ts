@@ -5,7 +5,8 @@
 
 export type Platform = "mediapipe" | "arkit";
 export type BaselineMode = "low" | "median";
-export type Tier = "primary" | "compound" | "social" | "cognitive" | "physical";
+/** "extended" expressions are only scored when the extended catalogue is switched on. */
+export type Tier = "primary" | "compound" | "social" | "cognitive" | "physical" | "extended";
 
 export interface ModelTerm {
   /** Measurement key; may contain "{S}" for bilateral AUs. */
@@ -105,6 +106,18 @@ export interface ModelParams {
   perclos: { windowSec: number; closed: number; maxSqueeze: number };
   yawn: { open: number; startSec: number; fullSec: number; holdSec: number };
   stillness: { tau: number; degPerSec: number };
+  /** Blink rate (per minute) mapped to the BLINKS feature. */
+  blinkRate: { lo: number; hi: number };
+  /** Personal range calibration: timing, acceptance threshold and gain limits. */
+  range: { settleSec: number; holdSec: number; minFraction: number; gainMin: number; gainMax: number };
+}
+
+/** One guided maximal expression used to learn a person's range of movement. */
+export interface ModelRangeStep {
+  id: string;
+  prompt: string;
+  /** Measurements expected to move, and in which direction (+1 up, -1 down). */
+  targets: { m: string; dir: 1 | -1 }[];
 }
 
 export interface EmotionModel {
@@ -121,6 +134,7 @@ export interface EmotionModel {
   }>;
   tiers: Record<Tier, string>;
   expressions: ModelExpression[];
+  rangeSteps: ModelRangeStep[];
   references: Record<string, string>;
 }
 
@@ -146,6 +160,13 @@ export interface CompiledChannel {
 
 export interface CompiledMeasurement extends ModelMeasurement {
   key: string;
+}
+
+export interface CompiledRangeStep {
+  id: string;
+  prompt: string;
+  /** Targets available on this platform, sides expanded; scale = the measurement's scale. */
+  targets: { key: string; dir: 1 | -1; scale: number }[];
 }
 
 export interface CompiledSlot {
@@ -183,9 +204,11 @@ export interface CompiledModel {
   byId: Map<string, CompiledExpression>;
   /** Every feature name an expression may reference. */
   featureNames: Set<string>;
+  /** Guided range-calibration steps, restricted to this platform's measurements. */
+  rangeSteps: CompiledRangeStep[];
 }
 
-export const TEMPORAL_FEATURES = ["PERCLOS", "YAWN", "STILL"] as const;
+export const TEMPORAL_FEATURES = ["PERCLOS", "YAWN", "STILL", "BLINKS"] as const;
 
 const expandSide = (s: string, side: SideName) => s.split("{S}").join(side);
 
@@ -278,6 +301,22 @@ export function compileModel(model: EmotionModel, platform: Platform): CompiledM
     if (!model.regions[model.aus[au].region]) errors.push(`${au}: unknown region ${model.aus[au].region}`);
   }
 
+  // Range steps: expand sides and keep only measurements this platform has.
+  const scaleOf = new Map(measurements.map((m) => [m.key, m.scale]));
+  const templates = new Set(Object.keys(p.measurements));
+  const allTemplates = new Set(Object.values(model.platforms).flatMap((pl) => Object.keys(pl.measurements)));
+  const rangeSteps: CompiledRangeStep[] = (model.rangeSteps ?? []).map((step) => {
+    const targets: CompiledRangeStep["targets"] = [];
+    for (const t of step.targets) {
+      if (t.dir !== 1 && t.dir !== -1) errors.push(`range step ${step.id}: dir must be 1 or -1`);
+      if (!allTemplates.has(t.m)) errors.push(`range step ${step.id}: unknown measurement ${t.m}`);
+      if (!templates.has(t.m)) continue;
+      const keys = t.m.includes("{S}") ? SIDES.map((s) => expandSide(t.m, s)) : [t.m];
+      for (const key of keys) targets.push({ key, dir: t.dir, scale: scaleOf.get(key)! });
+    }
+    return { id: step.id, prompt: step.prompt, targets };
+  });
+
   if (errors.length) throw new Error(`Invalid emotion model:\n  ${errors.join("\n  ")}`);
   return {
     model,
@@ -290,5 +329,6 @@ export function compileModel(model: EmotionModel, platform: Platform): CompiledM
     expressions,
     byId: new Map(expressions.map((e) => [e.id, e])),
     featureNames,
+    rangeSteps,
   };
 }
