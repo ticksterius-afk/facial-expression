@@ -95,6 +95,8 @@ export interface ModelParams {
     complexMax: number;
     switchMargin: number;
     switchHoldMs: number;
+    /** Groups of alternative readings; only the strongest of each group is listed. */
+    exclusive: string[][];
   };
   micro: { on: number; off: number; minPeak: number; minMs: number; maxMs: number; quietMs: number; exclude: string[] };
   blink: { on: number; off: number; minMs: number; maxMs: number };

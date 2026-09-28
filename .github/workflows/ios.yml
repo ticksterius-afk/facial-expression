@@ -1,0 +1,46 @@
+name: iOS
+
+on:
+  push:
+    paths: ["ios/**", "model/**", ".github/workflows/ios.yml"]
+  pull_request:
+    paths: ["ios/**", "model/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: Swift engine tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.1
+    steps:
+      - uses: actions/checkout@v5
+      - name: Unit tests + parity with the TypeScript engine (model/fixtures/golden.json)
+        working-directory: ios/EmotionEngine
+        run: swift test
+
+  app:
+    name: Build iOS app (simulator, unsigned)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install XcodeGen
+        run: command -v xcodegen || brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Engine tests on macOS
+        working-directory: ios/EmotionEngine
+        run: swift test
+      - name: Build app
+        working-directory: ios
+        run: |
+          xcodebuild -project Mien.xcodeproj -scheme Mien \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug CODE_SIGNING_ALLOWED=NO build -quiet

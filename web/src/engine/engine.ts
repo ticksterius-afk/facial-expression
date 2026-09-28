@@ -166,10 +166,18 @@ export class EmotionEngine {
     }
     if (face) this.stabilise(best, tMs, d);
 
+    const taken = new Set<number>();
     const complex = this.cm.expressions
       .filter((e) => e.tier !== "primary" && this.scores[e.id] >= d.complexMin)
       .map((e) => ({ id: e.id, score: this.scores[e.id] }))
       .sort((x, y) => y.score - x.score)
+      .filter((c) => {
+        const g = d.exclusive.findIndex((group) => group.includes(c.id));
+        if (g < 0) return true;
+        if (taken.has(g)) return false;
+        taken.add(g);
+        return true;
+      })
       .slice(0, d.complexMax);
 
     const regions: Record<string, number> = {};

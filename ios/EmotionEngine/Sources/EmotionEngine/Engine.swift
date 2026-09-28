@@ -141,10 +141,15 @@ public final class EmotionEngine {
         if face { stabilise(best, tMs) }
 
         // Stable ranking: score descending, model order breaks ties (like JS's stable sort).
+        var taken = Set<Int>()
         let complex = cm.expressions.enumerated()
             .filter { $0.element.tier != "primary" && scores[$0.element.id]! >= d.complexMin }
             .map { (index: $0.offset, ranked: Ranked(id: $0.element.id, score: scores[$0.element.id]!)) }
             .sorted { $0.ranked.score != $1.ranked.score ? $0.ranked.score > $1.ranked.score : $0.index < $1.index }
+            .filter { c in
+                guard let g = d.exclusive.firstIndex(where: { $0.contains(c.ranked.id) }) else { return true }
+                return taken.insert(g).inserted
+            }
             .prefix(d.complexMax)
             .map(\.ranked)
 

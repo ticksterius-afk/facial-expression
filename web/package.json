@@ -12,8 +12,13 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "fetch-model": "node scripts/fetch-model.mjs",
-    "golden": "node --experimental-strip-types scripts/make-golden.ts",
-    "e2e": "playwright test"
+    "golden": "node --experimental-strip-types --no-warnings scripts/make-golden.ts",
+    "e2e": "playwright test",
+    "sync:ios": "node scripts/sync-ios.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "format:model": "node scripts/format-model.mjs",
+    "check": "node scripts/format-model.mjs --check && node scripts/sync-ios.mjs --check && tsc --noEmit && vitest run",
+    "prebuild": "node scripts/fetch-model.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1"

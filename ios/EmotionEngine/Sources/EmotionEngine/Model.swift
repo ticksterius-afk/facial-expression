@@ -65,6 +65,8 @@ public struct ModelParams: Codable, Sendable {
         public let primaryMin, complexMin: Double
         public let complexMax: Int
         public let switchMargin, switchHoldMs: Double
+        /// Groups of alternative readings; only the strongest of each group is listed.
+        public let exclusive: [[String]]
     }
     public struct Micro: Codable, Sendable {
         public let on, off, minPeak, minMs, maxMs, quietMs: Double
