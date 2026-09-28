@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0d12" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Mien" />
+    <meta name="description" content="Real-time facial expression reader: primary, compound and complex emotions, explained by the facial muscle actions (FACS) behind them. Runs entirely on your device." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <title>Mien — facial expression reader</title>
+  </head>
+  <body>
+    <div id="app">
+      <section id="stage" aria-label="Camera">
+        <video id="video" playsinline muted autoplay></video>
+        <canvas id="overlay"></canvas>
+
+        <header id="hud">
+          <div class="brand">Mien</div>
+          <button id="status" class="chip" type="button" aria-label="Calibration status">
+            <span class="dot"></span><span id="status-text">Starting…</span>
+          </button>
+          <div class="hud-actions">
+            <button id="btn-flip" class="icon-btn" type="button" aria-label="Switch camera" title="Switch camera">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-2h6l2 2h3v12H4z" /><path d="M9 13a3 3 0 0 0 5.2 2M15 11a3 3 0 0 0-5.2-2" /><path d="M14.5 15.5 14.2 15l.6-.3M9.5 8.5l.3.5-.6.3" /></svg>
+            </button>
+            <button id="btn-settings" class="icon-btn" type="button" aria-label="Settings" title="Settings">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
+            </button>
+          </div>
+        </header>
+
+        <div id="readout" aria-live="polite">
+          <div class="primary">
+            <span id="primary-emoji" class="emoji" aria-hidden="true">😐</span>
+            <div class="primary-text">
+              <div class="label-row"><span id="primary-name" class="name">Neutral</span><span id="primary-pct" class="pct"></span></div>
+              <div class="meter"><span id="primary-bar"></span></div>
+              <div id="primary-gloss" class="gloss">Waiting for a face…</div>
+            </div>
+          </div>
+          <div id="complex" class="chips" aria-label="Complex states"></div>
+        </div>
+        <div id="noface" class="noface" hidden>No face in view</div>
+      </section>
+
+      <section id="panel" aria-label="Details">
+        <nav class="tabs" role="tablist">
+          <button role="tab" data-tab="emotions" aria-selected="true">Emotions</button>
+          <button role="tab" data-tab="face" aria-selected="false">Face</button>
+          <button role="tab" data-tab="why" aria-selected="false">Why</button>
+          <button role="tab" data-tab="log" aria-selected="false">Log</button>
+        </nav>
+        <div class="tab-body" data-body="emotions" id="tab-emotions"></div>
+        <div class="tab-body" data-body="face" id="tab-face" hidden></div>
+        <div class="tab-body" data-body="why" id="tab-why" hidden></div>
+        <div class="tab-body" data-body="log" id="tab-log" hidden></div>
+      </section>
+    </div>
+
+    <div id="start" class="sheet-overlay">
+      <div class="start-card">
+        <div class="logo" aria-hidden="true"><img src="./icons/icon.svg" alt="" width="64" height="64" /></div>
+        <h1>Mien</h1>
+        <p class="lede">Reads facial expressions in real time and names them — the seven primary emotions, the fifteen compound emotions, and social, cognitive and physical states — and shows which muscles of the face are doing the talking.</p>
+        <div class="start-actions">
+          <button id="btn-start" class="primary-btn" type="button">Start camera</button>
+          <label class="secondary-btn" for="file-input">Analyze a video file</label>
+          <input id="file-input" type="file" accept="video/*" hidden />
+        </div>
+        <p class="fine">Everything runs on this device. No images or data leave it.</p>
+        <p class="fine">Faces show <em>expressions</em>, not guaranteed feelings — the same movement can mean different things in different contexts and cultures. Treat the labels as descriptions of what the face is doing.</p>
+        <p id="start-error" class="error" hidden></p>
+      </div>
+    </div>
+
+    <div id="calib" class="sheet-overlay" hidden>
+      <div class="calib-card">
+        <svg class="ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" class="track" /><circle id="calib-arc" cx="50" cy="50" r="44" class="arc" /></svg>
+        <h2 id="calib-title">Calibrate your neutral face</h2>
+        <p id="calib-text">Everyone's resting face is different. Look at the screen with a relaxed, neutral expression for three seconds so expressions are measured from <em>your</em> baseline.</p>
+        <div class="calib-actions">
+          <button id="btn-calib-go" class="primary-btn" type="button">Calibrate</button>
+          <button id="btn-calib-skip" class="text-btn" type="button">Not now</button>
+        </div>
+      </div>
+    </div>
+
+    <dialog id="settings">
+      <form method="dialog">
+        <h2>Settings</h2>
+        <label class="field">Sensitivity <output id="sens-out">1.0×</output>
+          <input id="sens" type="range" min="0.6" max="1.8" step="0.1" value="1" />
+        </label>
+        <label class="field row">Face overlay
+          <select id="overlay-mode">
+            <option value="regions">Regions</option>
+            <option value="labels">Regions + AU labels</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label class="field row">Mirror front camera <input id="mirror" type="checkbox" checked /></label>
+        <label class="field row">Processing
+          <select id="delegate">
+            <option value="GPU">GPU (fast)</option>
+            <option value="CPU">CPU (compatible)</option>
+          </select>
+        </label>
+        <div class="field">
+          <button id="btn-recalibrate" type="button" class="secondary-btn">Recalibrate neutral face</button>
+          <button id="btn-forget" type="button" class="text-btn">Forget calibration</button>
+        </div>
+        <p class="fine">Mien uses MediaPipe Face Landmarker for tracking and a FACS-based model (Ekman &amp; Friesen; Du, Tao &amp; Martinez; Keltner; Tracy &amp; Robins; Prkachin &amp; Solomon) to name expressions. See the repository's docs/RESEARCH.md for the science and its limits.</p>
+        <menu><button value="close" class="primary-btn">Done</button></menu>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
