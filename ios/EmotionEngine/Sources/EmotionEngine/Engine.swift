@@ -6,6 +6,11 @@ public typealias Pose = (pitch: Double, yaw: Double, roll: Double)
 public struct Ranked: Equatable, Sendable {
     public let id: String
     public let score: Double
+
+    public init(id: String, score: Double) {
+        self.id = id
+        self.score = score
+    }
 }
 
 public struct FrameResult: Sendable {
