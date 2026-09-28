@@ -50,6 +50,15 @@ struct ExpressionMeta {
 
 func percent(_ v: Double) -> String { "\(Int((v * 100).rounded()))%" }
 
+/// Short codes for the non-FACS gaze features.
+func gazeCode(_ id: String) -> String {
+    switch id {
+    case "GAZE_DOWN": return "gaze↓"
+    case "GAZE_AWAY": return "gaze↔"
+    default: return id
+    }
+}
+
 /// Human label for a feature such as "AU12", "AU14U", "GAZE_DOWN" or "PERCLOS".
 func featureLabel(_ f: String, _ model: EmotionModel) -> (code: String, name: String) {
     let suffixes: [Character: String] = ["L": " (left)", "R": " (right)", "U": " (one-sided)", "B": " (both sides)"]
@@ -62,7 +71,7 @@ func featureLabel(_ f: String, _ model: EmotionModel) -> (code: String, name: St
         }
         return (base, (model.aus[base]?.name ?? base) + suffix)
     }
-    if let au = model.aus[f] { return ("gaze", au.name) }
+    if let au = model.aus[f] { return (gazeCode(f), au.name) }
     if let t = model.temporal[f] { return (f == "PERCLOS" ? "PERCLOS" : "time", t.name) }
     return (f, f)
 }

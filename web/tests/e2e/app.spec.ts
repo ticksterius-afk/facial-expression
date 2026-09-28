@@ -55,6 +55,14 @@ test("recognises expressions in a real face video", async ({ page }, info) => {
   expect(withFace.length / samples.length).toBeGreaterThan(0.8);
   expect(labels).toContain("happiness");
   expect(labels.length).toBeGreaterThan(1);
+
+  // The explanation panel lists the actions behind the current label.
+  await page.getByRole("tab", { name: "Why" }).click();
+  await expect(page.locator("#tab-why .why-head h3")).toBeVisible();
+  await page.screenshot({ path: info.outputPath("why.png") });
+  await page.getByRole("tab", { name: "Face" }).click();
+  await expect(page.locator("#tab-face .stat").first()).toBeVisible();
+  await page.screenshot({ path: info.outputPath("face.png") });
 });
 
 test("calibrates to a neutral face", async ({ page }) => {

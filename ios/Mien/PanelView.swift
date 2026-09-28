@@ -120,7 +120,7 @@ private struct FaceList: View {
                     let au = cm.model.aus[id]!
                     let v = o?.aus[id] ?? 0
                     HStack(spacing: 10) {
-                        Text(id.hasPrefix("AU") ? id : "gaze").font(.caption.monospaced()).foregroundStyle(Theme.accent).frame(width: 46, alignment: .leading)
+                        Text(id.hasPrefix("AU") ? id : gazeCode(id)).font(.caption.monospaced()).foregroundStyle(Theme.accent).frame(width: 46, alignment: .leading)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(au.name).font(.subheadline)
                             Text(au.muscles).font(.caption2).foregroundStyle(.secondary).lineLimit(1)

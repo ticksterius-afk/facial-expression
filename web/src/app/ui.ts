@@ -8,6 +8,8 @@ const el = (tag: string, cls?: string, text?: string) => {
   return e;
 };
 const pct = (v: number) => `${Math.round(v * 100)}%`;
+/** Short codes for the non-FACS gaze features. */
+const gazeCode = (id: string) => (id === "GAZE_DOWN" ? "gaze↓" : id === "GAZE_AWAY" ? "gaze↔" : id);
 
 export const PRIMARY_COLORS: Record<string, string> = {
   neutral: "#6f7886",
@@ -69,7 +71,7 @@ export class UI {
       const suffix = { L: " (left)", R: " (right)", U: " (one-sided)", B: " (both sides)" }[m[2] ?? ""] ?? "";
       return { code: m[1], name: (au?.name ?? m[1]) + suffix };
     }
-    if (this.model.aus[f]) return { code: "gaze", name: this.model.aus[f].name };
+    if (this.model.aus[f]) return { code: gazeCode(f), name: this.model.aus[f].name };
     if (this.model.temporal[f]) return { code: f === "PERCLOS" ? "PERCLOS" : "time", name: this.model.temporal[f].name };
     return { code: f, name: f };
   }
@@ -147,7 +149,7 @@ export class UI {
         const barWrap = el("span", "bar");
         barWrap.append(bar);
         const value = el("span", "v", "0");
-        root.append(el("span", "code", id.startsWith("AU") ? id : "gaze"), name, barWrap, value);
+        root.append(el("span", "code", id.startsWith("AU") ? id : gazeCode(id)), name, barWrap, value);
         host.append(root);
         this.auRows.set(id, { root, bar, value });
       }
