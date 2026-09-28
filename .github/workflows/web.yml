@@ -36,6 +36,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Face video for end-to-end tests
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg >/dev/null
           curl -sSfL -o "$RUNNER_TEMP/clip.mp4" https://raw.githubusercontent.com/cosanlab/py-feat/main/feat/tests/data/WolfgangLanger_Pexels.mp4
           ffmpeg -loglevel error -i "$RUNNER_TEMP/clip.mp4" -pix_fmt yuv420p "$RUNNER_TEMP/clip.y4m"
       - name: End-to-end tests (Chromium, fake camera fed with the face video)

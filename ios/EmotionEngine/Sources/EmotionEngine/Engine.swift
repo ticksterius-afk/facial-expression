@@ -140,18 +140,25 @@ public final class EmotionEngine {
         }
         if face { stabilise(best, tMs) }
 
-        // Stable ranking: score descending, model order breaks ties (like JS's stable sort).
+        // Stable ranking: score descending, model order breaks ties (like JS's stable sort);
+        // only the strongest member of each exclusive group is listed.
+        var candidates: [(index: Int, ranked: Ranked)] = []
+        for (i, e) in cm.expressions.enumerated() where e.tier != "primary" {
+            let s = scores[e.id]!
+            if s >= d.complexMin { candidates.append((i, Ranked(id: e.id, score: s))) }
+        }
+        candidates.sort { a, b in
+            a.ranked.score != b.ranked.score ? a.ranked.score > b.ranked.score : a.index < b.index
+        }
         var taken = Set<Int>()
-        let complex = cm.expressions.enumerated()
-            .filter { $0.element.tier != "primary" && scores[$0.element.id]! >= d.complexMin }
-            .map { (index: $0.offset, ranked: Ranked(id: $0.element.id, score: scores[$0.element.id]!)) }
-            .sorted { $0.ranked.score != $1.ranked.score ? $0.ranked.score > $1.ranked.score : $0.index < $1.index }
-            .filter { c in
-                guard let g = d.exclusive.firstIndex(where: { $0.contains(c.ranked.id) }) else { return true }
-                return taken.insert(g).inserted
+        var complex: [Ranked] = []
+        for c in candidates where complex.count < d.complexMax {
+            if let g = d.exclusive.firstIndex(where: { $0.contains(c.ranked.id) }) {
+                if taken.contains(g) { continue }
+                taken.insert(g)
             }
-            .prefix(d.complexMax)
-            .map(\.ranked)
+            complex.append(c.ranked)
+        }
 
         var regions: [String: Double] = [:]
         for r in cm.model.regions.keys { regions[r] = 0 }
@@ -165,7 +172,7 @@ public final class EmotionEngine {
         return FrameResult(
             tMs: tMs, face: face, aus: f, scores: scores,
             primary: Ranked(id: current.id, score: primaryScore), neutral: 1 - maxPrimary,
-            complex: face ? Array(complex) : [], regions: regions, pspi: face ? EmotionEngine.pspiOf(f) : 0,
+            complex: face ? complex : [], regions: regions, pspi: face ? EmotionEngine.pspiOf(f) : 0,
             pose: pose, blinkRate: temporal.blinkRate, perclos: temporal.perclos, events: events,
             calibrated: baseline.calibrated, calibrationActive: baseline.calibrating,
             calibrationProgress: progress, calibrationResult: calResult)

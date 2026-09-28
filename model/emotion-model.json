@@ -5,6 +5,7 @@
     "evidence": [0.1, 0.55],
     "floor": 0.02,
     "supportGain": 0.3,
+    "strictness": { "primary": 0.5, "compound": 0.8, "social": 0.5, "cognitive": 0.6, "physical": 0.5 },
     "adapt": { "lowTauDown": 8, "lowTauUp": 120, "medianTau": 90, "maxDriftUncalibrated": 1, "maxDriftCalibrated": 0.35, "deadzoneInitial": 0.6, "deadzoneLearned": 0.35, "deadzoneLearnSec": 90, "deadzoneCalibrated": 0.2 },
     "asymmetry": { "noise": 0.08, "yawFull": 12, "yawZero": 30 },
     "gaze": { "eyeDegPerUnit": 30 },

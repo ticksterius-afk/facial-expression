@@ -80,7 +80,7 @@ public func scoreVariant(_ cm: CompiledModel, _ v: CompiledVariant, _ f: Feature
         arith += s.w * ev
         logSum += s.w * log(max(ev, floor))
     }
-    let core = 0.5 * (arith / v.slotWeight) + 0.5 * exp(logSum / v.slotWeight)
+    let core = (1 - v.strictness) * (arith / v.slotWeight) + v.strictness * exp(logSum / v.slotWeight)
 
     var support = 0.0
     if v.supportWeight > 0 {

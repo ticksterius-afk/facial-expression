@@ -74,6 +74,8 @@ export interface ModelParams {
   evidence: [number, number];
   floor: number;
   supportGain: number;
+  /** Per tier: weight of the geometric mean in the core soft-AND (1 = every core action required). */
+  strictness: Record<Tier, number>;
   adapt: {
     lowTauDown: number;
     lowTauUp: number;
@@ -155,6 +157,8 @@ export interface CompiledSlot {
 
 export interface CompiledVariant {
   name: string;
+  /** Weight of the geometric mean in the soft-AND (from params.strictness for the tier). */
+  strictness: number;
   slots: CompiledSlot[];
   support: CompiledSlot[];
   inhibit: CompiledSlot[];
@@ -247,6 +251,7 @@ export function compileModel(model: EmotionModel, platform: Platform): CompiledM
     if (ids.has(e.id)) errors.push(`duplicate expression id ${e.id}`);
     ids.add(e.id);
     if (!model.tiers[e.tier]) errors.push(`${e.id}: unknown tier ${e.tier}`);
+    if (!(model.params.strictness?.[e.tier] >= 0 && model.params.strictness[e.tier] <= 1)) errors.push(`${e.id}: params.strictness.${e.tier} must be in [0, 1]`);
     for (const r of e.refs) if (!model.references[r]) errors.push(`${e.id}: unknown reference ${r}`);
     if (e.variants && e.slots) errors.push(`${e.id}: use either variants or top-level slots`);
     const variants: ModelVariant[] = e.variants ?? [{ name: "", slots: e.slots ?? [], support: e.support ?? [], inhibit: e.inhibit ?? [] }];
@@ -258,6 +263,7 @@ export function compileModel(model: EmotionModel, platform: Platform): CompiledM
       for (const s of inhibit) if (s.w > 1) errors.push(`${e.id}: inhibit weight must be <= 1`);
       return {
         name: v.name,
+        strictness: model.params.strictness[e.tier],
         slots,
         support,
         inhibit,

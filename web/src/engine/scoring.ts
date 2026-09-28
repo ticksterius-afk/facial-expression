@@ -99,10 +99,11 @@ export function slotEvidence(slot: CompiledSlot, f: Features): number {
 /**
  * Score of one expression prototype in [0, 1].
  *
- * Core slots are combined with a soft AND — the mean of the weighted
+ * Core slots are combined with a soft AND — a blend of the weighted
  * arithmetic mean (tolerant: partial configurations still count) and the
  * weighted geometric mean (strict: a missing core action pulls the score
- * down hard). Supporting actions can raise the score by up to `supportGain`;
+ * down hard). The blend is set per tier: compound emotions are defined by
+ * the co-occurrence of both components' actions, so they are stricter. Supporting actions can raise the score by up to `supportGain`;
  * each inhibiting action multiplies it by (1 - w * evidence). An expression's
  * score is that of its best-matching variant.
  */
@@ -128,7 +129,7 @@ export function scoreVariant(cm: CompiledModel, v: CompiledVariant, f: Features)
     arith += s.w * ev;
     logSum += s.w * Math.log(Math.max(ev, floor));
   }
-  const core = 0.5 * (arith / v.slotWeight) + 0.5 * Math.exp(logSum / v.slotWeight);
+  const core = (1 - v.strictness) * (arith / v.slotWeight) + v.strictness * Math.exp(logSum / v.slotWeight);
 
   let support = 0;
   if (v.supportWeight > 0) {

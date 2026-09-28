@@ -80,6 +80,8 @@ public struct ModelParams: Codable, Sendable {
     public let evidence: [Double]
     public let floor: Double
     public let supportGain: Double
+    /// Per tier: weight of the geometric mean in the core soft-AND.
+    public let strictness: [String: Double]
     public let adapt: Adapt
     public let asymmetry: Asymmetry
     public let gaze: Gaze
@@ -172,6 +174,7 @@ public struct CompiledSlot: Sendable {
 
 public struct CompiledVariant: Sendable {
     public let name: String
+    public let strictness: Double
     public let slots: [CompiledSlot]
     public let support: [CompiledSlot]
     public let inhibit: [CompiledSlot]
@@ -260,6 +263,8 @@ public struct CompiledModel: Sendable {
             if seen.contains(e.id) { errors.append("duplicate expression id \(e.id)") }
             seen.insert(e.id)
             if model.tiers[e.tier] == nil { errors.append("\(e.id): unknown tier \(e.tier)") }
+            let strictness = model.params.strictness[e.tier] ?? -1
+            if !(strictness >= 0 && strictness <= 1) { errors.append("\(e.id): params.strictness.\(e.tier) must be in [0, 1]") }
             for r in e.refs where model.references[r] == nil { errors.append("\(e.id): unknown reference \(r)") }
             if e.variants != nil && e.slots != nil { errors.append("\(e.id): use either variants or top-level slots") }
             let raw = e.variants ?? [ModelVariant(name: "", slots: e.slots ?? [], support: e.support ?? [], inhibit: e.inhibit ?? [])]
@@ -269,7 +274,7 @@ public struct CompiledModel: Sendable {
                 let support = compileSlots(e.id, v.support)
                 let inhibit = compileSlots(e.id, v.inhibit)
                 for s in inhibit where s.w > 1 { errors.append("\(e.id): inhibit weight must be <= 1") }
-                return CompiledVariant(name: v.name, slots: slots, support: support, inhibit: inhibit,
+                return CompiledVariant(name: v.name, strictness: strictness, slots: slots, support: support, inhibit: inhibit,
                                        slotWeight: slots.reduce(0) { $0 + $1.w }, supportWeight: support.reduce(0) { $0 + $1.w })
             }
             expressions.append(CompiledExpression(id: e.id, tier: e.tier, name: e.name, emoji: e.emoji, gloss: e.gloss, cues: e.cues, refs: e.refs, variants: variants))
