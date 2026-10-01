@@ -1,5 +1,5 @@
 {
-  "version": "1.2.0",
+  "version": "1.2.1",
   "about": "Facial expression model: FACS Action Units estimated from face-tracking signals, and expression prototypes defined over those AUs. Shared by the web (TypeScript) and iOS (Swift) engines. See docs/RESEARCH.md for the evidence behind every prototype and docs/ARCHITECTURE.md for the scoring maths.",
   "params": {
     "evidence": [0.1, 0.55],
@@ -120,8 +120,8 @@
         "pose.roll": { "rest": 0, "scale": 15, "spread": 8.3, "mode": "median" },
         "gaze.yaw": { "rest": 0, "scale": 25, "spread": 10, "mode": "median" },
         "gaze.pitch": { "rest": 0, "scale": 20, "spread": 10, "mode": "median" },
-        "tex.foreheadLines": { "rest": -4.2, "scale": 0.6, "spread": 0.35, "mode": "low", "drift": 4, "poseGate": [6, 14] },
-        "tex.glabellaLines": { "rest": -3.85, "scale": 0.5, "spread": 0.3, "mode": "low", "drift": 4, "poseGate": [6, 14] }
+        "tex.foreheadLines": { "rest": -3.9, "scale": 0.6, "spread": 0.35, "mode": "low", "drift": 4, "poseGate": [6, 14] },
+        "tex.glabellaLines": { "rest": -3.55, "scale": 0.5, "spread": 0.3, "mode": "low", "drift": 4, "poseGate": [6, 14] }
       },
       "recipes": {
         "AU1": [{ "m": "browInnerUp", "r": 0.55, "w": 0.56 }, { "m": "geo.browInnerHeight{S}", "r": 0.11, "w": 0.24 }, { "m": "tex.foreheadLines", "r": 0.5, "w": 0.2 }],

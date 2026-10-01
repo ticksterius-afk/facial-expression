@@ -99,7 +99,7 @@ mean recall over the seven labels with at least 18 photos.
 | v1.0.0 | 45.6% | 31.8% | 1 / 18 | 12 |
 | First draft: fear as best of full face, 1+2+5 and 5+20 (tier strictness) | 43.5% | 31.9% | 3 / 18 | 137 |
 | Partial faces as strict ANDs | 44.6% | 31.7% | 2 / 18 | 58 |
-| Full face restored to v1.0 weights; partials 1+2+4+5 and 5+20, strict | **45.4%** | **31.7%** | 1 / 18 | 32 |
+| Full face restored to v1.0 weights; partials 1+2+4+5 and 5+20, strict (v1.2.1, with texture) | **45.5%** | **31.7%** | 1 / 18 | 31 |
 
 The first draft was rejected: its 1+2+5 variant fired on 54 surprise photos, and its
 two-action variants fired when only one action was present. What separates fear from
@@ -117,9 +117,23 @@ measured from pixels, separate raised brows (surprise AUC 0.64, fear 0.71) and f
 −0.70 glabella) more than the brows (r = 0.24); a second-derivative ridge measure did
 not remove this (0.68). They are therefore **pose-gated**: full weight within 6° of the
 person's baseline pitch and yaw, none beyond 14°. With the gate, on the 298
-near-frontal photos they raise balanced accuracy from 37.4% to 38.4% (sadness +5,
-anger +3, surprise +2 points, neutral −3), and the calibrated video output is almost
-unchanged (the confound is gone).
+near-frontal photos they raise accuracy from 55.7% to 56.7% and balanced accuracy
+from 37.4% to 38.5% (sadness +5, surprise +2, neutral +1 points), and the calibrated
+video output is almost unchanged (the confound is gone).
+
+Their uncalibrated starting level (`rest`) sits 0.3 above the median of the neutral
+photos. The baseline is a lower envelope — it drops to a lower level within seconds
+but rises slowly — so starting high means a camera or face with more texture than
+the photos is not read as a frown while the baseline catches up. On the face video
+without calibration this cut AU4's 90th percentile from 0.27 to 0.07; on the photos
+it changed nothing or helped (the numbers above are with it). A shift of 0.6 helped
+the video slightly more (0.05) but cost anger recall on the photos.
+
+**More fear photos were not available.** The full labelled photo set has only 21 fear
+images. Openly licensed photo collections (Openverse/Flickr, Wikimedia Commons,
+Unsplash, Pexels) and the usual mirrors of research sets such as FER-2013 are not
+reachable from the build environment, and sets that require a signed agreement (CK+,
+JAFFE, KDEF) were not used.
 
 **Why fear is still hard on the web.** In the face video the actress shows a clear
 fear face (inner brows up and drawn together, eyes wide, hand over the mouth). After
